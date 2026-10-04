@@ -200,7 +200,8 @@ async def save_daily_backup_snapshot() -> str:
                 for row in v
             ]
             for k, v in data.items()
-        }
+        },
+    }
     with open(json_filepath, "w", encoding="utf-8") as jf:
         json.dump(sanitized_data, jf, indent=2, ensure_ascii=False)
 
