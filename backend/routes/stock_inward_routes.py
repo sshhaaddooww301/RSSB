@@ -40,3 +40,5 @@ async def create_inward(
         return ApiResponse(message="Stock inward recorded successfully", data=result)
     except GraphClientError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Inward recording failed: {str(e)}")

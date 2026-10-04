@@ -233,8 +233,15 @@ async def _generate_inward_id(dt: str) -> str:
     parsed = _parse_date(dt) or date.today()
     date_part = parsed.strftime("%Y%m%d")
     rows = await graph_client.get_table_data(settings.TABLE_STOCK_INWARD)
-    today_rows = [r for r in rows if str(r.get("Transaction_ID", "")).startswith(f"IN-{date_part}")]
-    seq = len(today_rows) + 1
+    prefix = f"IN-{date_part}-"
+    max_seq = 0
+    for r in rows:
+        tid = str(r.get("Transaction_ID", "")).strip()
+        if tid.startswith(prefix):
+            suffix = tid[len(prefix):]
+            if suffix.isdigit():
+                max_seq = max(max_seq, int(suffix))
+    seq = max_seq + 1
     return f"IN-{date_part}-{seq:04d}"
 
 
@@ -314,8 +321,15 @@ async def _generate_bartan_inward_id(dt: str) -> str:
     parsed = _parse_date(dt) or date.today()
     date_part = parsed.strftime("%Y%m%d")
     rows = await graph_client.get_table_data(settings.TABLE_BARTAN_INWARD)
-    today_rows = [r for r in rows if str(r.get("Record_ID", "")).startswith(f"BI-{date_part}")]
-    seq = len(today_rows) + 1
+    prefix = f"BI-{date_part}-"
+    max_seq = 0
+    for r in rows:
+        rid = str(r.get("Record_ID", "")).strip()
+        if rid.startswith(prefix):
+            suffix = rid[len(prefix):]
+            if suffix.isdigit():
+                max_seq = max(max_seq, int(suffix))
+    seq = max_seq + 1
     return f"BI-{date_part}-{seq:04d}"
 
 
@@ -370,8 +384,15 @@ async def _generate_outward_id(dt: str) -> str:
     parsed = _parse_date(dt) or date.today()
     date_part = parsed.strftime("%Y%m%d")
     rows = await graph_client.get_table_data(settings.TABLE_STOCK_OUTWARD)
-    today_rows = [r for r in rows if str(r.get("Transaction_ID", "")).startswith(f"OUT-{date_part}")]
-    seq = len(today_rows) + 1
+    prefix = f"OUT-{date_part}-"
+    max_seq = 0
+    for r in rows:
+        tid = str(r.get("Transaction_ID", "")).strip()
+        if tid.startswith(prefix):
+            suffix = tid[len(prefix):]
+            if suffix.isdigit():
+                max_seq = max(max_seq, int(suffix))
+    seq = max_seq + 1
     return f"OUT-{date_part}-{seq:04d}"
 
 
@@ -514,7 +535,14 @@ async def create_user(data: dict) -> dict:
         raise GraphClientError(f"Username '{data['Username']}' already exists", 409)
     now = _now_str()
     all_users_raw = await graph_client.get_table_data(settings.TABLE_USERS)
-    user_id = f"USR-{len(all_users_raw) + 1:04d}"
+    max_seq = 0
+    for u in all_users_raw:
+        uid = str(u.get("User_ID", "")).strip()
+        if uid.startswith("USR-"):
+            suffix = uid[4:]
+            if suffix.isdigit():
+                max_seq = max(max_seq, int(suffix))
+    user_id = f"USR-{max_seq + 1:04d}"
     values = [
         user_id,
         data["Username"],
@@ -562,7 +590,14 @@ async def update_user(username: str, data: dict) -> dict:
 async def create_audit_log(data: dict) -> dict:
     now = _now_str()
     all_logs = await graph_client.get_table_data(settings.TABLE_AUDIT_LOGS)
-    log_id = f"LOG-{len(all_logs) + 1:06d}"
+    max_seq = 0
+    for l in all_logs:
+        lid = str(l.get("Log_ID", "")).strip()
+        if lid.startswith("LOG-"):
+            suffix = lid[4:]
+            if suffix.isdigit():
+                max_seq = max(max_seq, int(suffix))
+    log_id = f"LOG-{max_seq + 1:06d}"
     values = [
         log_id,
         now,

@@ -45,3 +45,5 @@ async def create_outward(
         return ApiResponse(message="Stock outward recorded successfully", data=result)
     except GraphClientError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Outward recording failed: {str(e)}")
