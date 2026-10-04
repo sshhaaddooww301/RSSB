@@ -52,8 +52,9 @@ class PostgresClient:
                 db_url,
                 pool_pre_ping=True,
                 pool_recycle=300,
-                pool_size=10,
-                max_overflow=20,
+                pool_size=5,
+                max_overflow=10,
+                connect_args={"connect_timeout": 5},
             )
             self._SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
         return self._engine
