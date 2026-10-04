@@ -1,0 +1,80 @@
+"""
+Configuration module — loads environment variables for the application.
+"""
+
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env from backend directory
+env_path = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=env_path)
+
+
+class Settings:
+    """Application settings loaded from environment variables."""
+
+    # Microsoft Graph API
+    MICROSOFT_CLIENT_ID: str = os.getenv("MICROSOFT_CLIENT_ID", "")
+    MICROSOFT_CLIENT_SECRET: str = os.getenv("MICROSOFT_CLIENT_SECRET", "")
+    MICROSOFT_TENANT_ID: str = os.getenv("MICROSOFT_TENANT_ID", "")
+
+    # Excel file on OneDrive / SharePoint
+    EXCEL_FILE_ID: str = os.getenv("EXCEL_FILE_ID", "")
+    EXCEL_DRIVE_ID: str = os.getenv("EXCEL_DRIVE_ID", "")
+    SHAREPOINT_SITE_ID: str = os.getenv("SHAREPOINT_SITE_ID", "")
+
+    # Database (Supabase / PostgreSQL / SQLite)
+    DATABASE_URL: str = os.getenv("DATABASE_URL", os.getenv("SUPABASE_DB_URL", ""))
+
+    # App
+    APP_SECRET_KEY: str = os.getenv("APP_SECRET_KEY", "dev-secret-change-in-production")
+    APP_ENV: str = os.getenv("APP_ENV", "development")
+    APP_PORT: int = int(os.getenv("APP_PORT", "8008"))
+    CORS_ORIGINS: list[str] = [
+        o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
+        if o.strip()
+    ]
+
+    # Token
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"))
+    ALGORITHM: str = "HS256"
+
+    @property
+    def is_production(self) -> bool:
+        return self.APP_ENV.lower() == "production"
+
+    def validate(self):
+        """Raise if critical settings are insecure in production."""
+        if self.is_production and self.APP_SECRET_KEY == "dev-secret-change-in-production":
+            raise RuntimeError(
+                "FATAL: APP_SECRET_KEY must be changed from the default value in production! "
+                "Set a strong random secret (at least 32 characters) in your .env file."
+            )
+
+    # Graph API base
+    GRAPH_BASE_URL: str = "https://graph.microsoft.com/v1.0"
+    GRAPH_SCOPE: str = "https://graph.microsoft.com/.default"
+
+    # Excel table names
+    TABLE_ITEMS: str = "ITEMS"
+    TABLE_STOCK_INWARD: str = "STOCK_INWARD"
+    TABLE_STOCK_OUTWARD: str = "STOCK_OUTWARD"
+    TABLE_DEPARTMENTS: str = "DEPARTMENTS"
+    TABLE_USERS: str = "USERS"
+    TABLE_AUDIT_LOGS: str = "AUDIT_LOGS"
+    TABLE_SETTINGS: str = "SETTINGS"
+    TABLE_BARTAN_INWARD: str = "BARTAN_INWARD"
+
+    # Valid units
+    VALID_UNITS: list[str] = ["KG", "QTL", "LITRE", "PACKET", "PIECE"]
+
+    # Valid departments
+    VALID_DEPARTMENTS: list[str] = ["Canteen", "Langar"]
+
+    # User roles
+    VALID_ROLES: list[str] = ["ADMIN", "MANAGER", "STAFF", "VIEWER"]
+
+
+settings = Settings()
+settings.validate()
