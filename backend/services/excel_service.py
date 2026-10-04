@@ -191,23 +191,38 @@ async def update_item(item_no: str, data: dict) -> dict:
 
     now = _now_str()
     sku_val = str(data.get("Langar_Requirement", data.get("SKU", existing.get("SKU", "")))).strip()
+
+    tot_in = _to_float(existing.get("Total_Inward", 0))
+    tot_out = _to_float(existing.get("Total_Outward", 0))
+
+    if "Current_Stock" in data and data["Current_Stock"] is not None:
+        target_current = _to_float(data["Current_Stock"])
+        new_opening = target_current - tot_in + tot_out
+        new_current = target_current
+    elif "Opening_Qty" in data and data["Opening_Qty"] is not None:
+        new_opening = _to_float(data["Opening_Qty"])
+        new_current = new_opening + tot_in - tot_out
+    else:
+        new_opening = _to_float(existing.get("Opening_Qty", 0))
+        new_current = new_opening + tot_in - tot_out
+
     values = [
         existing.get("Item_ID", item_no),
         item_no,
         data.get("Item_Name", existing.get("Item_Name", "")),
         sku_val,
         data.get("Unit", existing.get("Unit", "KG")),
-        _to_float(data.get("Opening_Qty", existing.get("Opening_Qty", 0))),
+        round(new_opening, 4),
         _to_float(data.get("Langar_Qty", existing.get("Langar_Qty", 0))),
         _to_float(data.get("Minimum_Stock", existing.get("Minimum_Stock", 0))),
         _to_float(data.get("Critical_Stock", existing.get("Critical_Stock", 0))),
-        0,
+        round(new_current, 4),
         data.get("Status", existing.get("Status", "Active")),
         existing.get("Created_Date", now),
         now,
     ]
     await graph_client.update_table_row(settings.TABLE_ITEMS, row_idx, values)
-    return {"Item_No": item_no, "updated": True}
+    return {"Item_No": item_no, "updated": True, "Current_Stock": round(new_current, 4), "Opening_Qty": round(new_opening, 4)}
 
 
 async def delete_item(item_no: str) -> dict:

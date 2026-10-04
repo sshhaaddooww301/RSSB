@@ -101,6 +101,7 @@ class ItemUpdate(BaseModel):
     Langar_Requirement: Optional[str] = None
     Unit: Optional[str] = None
     Opening_Qty: Optional[float] = None
+    Current_Stock: Optional[float] = None
     Langar_Qty: Optional[float] = None
     Minimum_Stock: Optional[float] = None
     Critical_Stock: Optional[float] = None
