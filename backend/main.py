@@ -192,13 +192,12 @@ async def graph_error_handler(request: Request, exc: GraphClientError):
 
 @app.exception_handler(Exception)
 async def general_error_handler(request: Request, exc: Exception):
-    # Never leak stack traces, internal variables, or system paths to client
     logger.exception("Internal error on %s: %s", request.url.path, exc)
     return JSONResponse(
         status_code=500,
         content={
             "success": False,
-            "message": "A secure server error occurred. Please try again later.",
+            "message": f"Server error: {type(exc).__name__}: {str(exc)}",
         },
     )
 
