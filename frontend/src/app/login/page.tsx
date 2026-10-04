@@ -7,8 +7,8 @@ import { login } from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,11 +29,6 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuickLogin = (u: string, p: string) => {
-    setUsername(u);
-    setPassword(p);
   };
 
   return (
@@ -96,39 +91,6 @@ export default function LoginPage() {
             {loading ? 'Signing In...' : 'Sign In to Dashboard'}
           </button>
         </form>
-
-        {/* Demo Quick Accounts */}
-        <div className="pt-3 border-t border-gray-100 text-center">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">
-            Quick Demo Accounts
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <button
-              onClick={() => handleQuickLogin('admin', 'admin123')}
-              className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-[11px] font-bold transition"
-            >
-              Admin
-            </button>
-            <button
-              onClick={() => handleQuickLogin('rahul', 'admin123')}
-              className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[11px] font-bold transition"
-            >
-              Manager (Rahul)
-            </button>
-            <button
-              onClick={() => handleQuickLogin('amit', 'admin123')}
-              className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-[11px] font-bold transition"
-            >
-              Staff (Amit)
-            </button>
-            <button
-              onClick={() => handleQuickLogin('suresh', 'admin123')}
-              className="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-[11px] font-bold transition"
-            >
-              Staff (Suresh)
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );
