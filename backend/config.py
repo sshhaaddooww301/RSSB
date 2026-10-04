@@ -30,9 +30,9 @@ class Settings:
     # App
     APP_SECRET_KEY: str = os.getenv("APP_SECRET_KEY", "dev-secret-change-in-production")
     APP_ENV: str = os.getenv("APP_ENV", "development")
-    APP_PORT: int = int(os.getenv("APP_PORT", "8008"))
+    APP_PORT: int = int(os.getenv("PORT", os.getenv("APP_PORT", "8008")))
     CORS_ORIGINS: list[str] = [
-        o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
+        o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",")
         if o.strip()
     ]
 
