@@ -457,6 +457,20 @@ export default function StockOutwardPage() {
                   ))}
                 </select>
               </div>
+
+              {/* SKU */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  SKU / Langar Req.
+                </label>
+                <input
+                  type="text"
+                  value={formData.SKU}
+                  onChange={(e) => setFormData({ ...formData, SKU: e.target.value })}
+                  placeholder="e.g. 50 Bags / 200 KG"
+                  className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium text-gray-900"
+                />
+              </div>
             </div>
 
             {/* Current Stock Banner if selected */}
