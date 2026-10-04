@@ -311,5 +311,16 @@ class PostgresClient:
             conn.commit()
         self._last_sync = datetime.now(timezone.utc).isoformat()
 
+    def delete_row_by_key(self, table_name: str, key_col: str, key_val: Any) -> None:
+        self.initialize_schema_if_needed()
+        tbl = self._table_db_name(table_name)
+        engine = self._get_engine()
+        with engine.connect() as conn:
+            stmt = sa.text(f"DELETE FROM {tbl} WHERE \"{key_col}\" = :key_val;")
+            conn.execute(stmt, {"key_val": key_val})
+            conn.commit()
+        self._last_sync = datetime.now(timezone.utc).isoformat()
+
 
 postgres_client = PostgresClient()
+

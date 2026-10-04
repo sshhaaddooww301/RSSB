@@ -210,7 +210,22 @@ async def update_item(item_no: str, data: dict) -> dict:
     return {"Item_No": item_no, "updated": True}
 
 
+async def delete_item(item_no: str) -> dict:
+    row_idx = await graph_client.find_row_index(settings.TABLE_ITEMS, "Item_No", item_no)
+    if row_idx is None:
+        raise GraphClientError(f"Item {item_no} not found", 404)
+
+    await graph_client.delete_table_row(
+        settings.TABLE_ITEMS,
+        row_index=row_idx,
+        key_col="Item_No",
+        key_val=item_no,
+    )
+    return {"Item_No": item_no, "deleted": True}
+
+
 # ═══════════════════════════════════════════════════════════════════════
+
 # STOCK INWARD
 # ═══════════════════════════════════════════════════════════════════════
 

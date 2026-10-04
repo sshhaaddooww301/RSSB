@@ -6,6 +6,7 @@ import {
   Plus,
   Search,
   Edit2,
+  Trash2,
   CheckCircle2,
   AlertTriangle,
   AlertCircle,
@@ -13,7 +14,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
-import { getItems, createItem, updateItem } from '@/lib/api';
+import { getItems, createItem, updateItem, deleteItem } from '@/lib/api';
 
 const UNITS = ['QTL', 'KG', 'PKT', 'LITRE', 'TIN'];
 
@@ -39,6 +40,12 @@ export default function InventoryPage() {
   });
   const [modalError, setModalError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Delete State
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<any | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
 
   const fetchItems = async () => {
     try {
@@ -270,13 +277,25 @@ export default function InventoryPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => openEditModal(item)}
-                        className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
-                        title="Edit Item"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end space-x-1">
+                        <button
+                          onClick={() => openEditModal(item)}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                          title="Edit Item"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setDeleteConfirmItem(item);
+                            setDeleteError(null);
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                          title="Delete Item"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -406,26 +425,140 @@ export default function InventoryPage() {
                   </div>
                 </div>
 
-                <div className="pt-3 flex justify-end space-x-2 border-t border-gray-100">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-xl font-semibold hover:bg-gray-50 transition cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold transition disabled:opacity-50 cursor-pointer"
-                  >
-                    {saving ? 'Saving...' : editingItem ? 'Update Item' : 'Create Item'}
-                  </button>
+                <div className="pt-3 flex items-center justify-between border-t border-gray-100">
+                  {editingItem ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsModalOpen(false);
+                        setDeleteConfirmItem(editingItem);
+                        setDeleteError(null);
+                      }}
+                      className="px-3.5 py-2 text-red-600 hover:bg-red-50 border border-red-200 rounded-xl font-semibold flex items-center space-x-1.5 transition cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete Item</span>
+                    </button>
+                  ) : (
+                    <div />
+                  )}
+
+                  <div className="flex space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsModalOpen(false)}
+                      className="px-4 py-2 border border-gray-300 rounded-xl font-semibold hover:bg-gray-50 transition cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold transition disabled:opacity-50 cursor-pointer"
+                    >
+                      {saving ? 'Saving...' : editingItem ? 'Update Item' : 'Create Item'}
+                    </button>
+                  </div>
                 </div>
               </form>
             </div>
           </div>
         )}
+
+        {/* Delete Confirmation Modal */}
+        {deleteConfirmItem && (
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full border border-gray-100 shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
+              <div className="bg-red-50 border-b border-red-100 px-5 py-4 flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600 shrink-0">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">Delete Inventory Item</h3>
+                  <p className="text-[11px] text-gray-500">Database se item permanently remove hoga</p>
+                </div>
+              </div>
+
+              <div className="p-5 space-y-3.5 text-xs">
+                {deleteError && (
+                  <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl font-medium flex items-center space-x-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{deleteError}</span>
+                  </div>
+                )}
+
+                <p className="text-gray-700">
+                  Kya aap sach mein is item ko delete karna chahte hain?
+                </p>
+
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 space-y-1.5">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Item No:</span>
+                    <span className="font-bold text-gray-900">{deleteConfirmItem.Item_No}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Item Name:</span>
+                    <span className="font-bold text-gray-900">{deleteConfirmItem.Item_Name}</span>
+                  </div>
+                  {(deleteConfirmItem.SKU || deleteConfirmItem.Langar_Requirement) && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">SKU / Requirement:</span>
+                      <span className="font-medium text-gray-800">{deleteConfirmItem.SKU || deleteConfirmItem.Langar_Requirement}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Current Stock:</span>
+                    <span className="font-bold text-red-600">{deleteConfirmItem.Current_Stock} {deleteConfirmItem.Unit}</span>
+                  </div>
+                </div>
+
+                <div className="p-2.5 bg-red-50/70 border border-red-200/80 rounded-xl text-[11px] text-red-700 flex items-start space-x-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
+                  <span>Yeh item Database (PostgreSQL/Excel) se permanently delete ho jayega.</span>
+                </div>
+              </div>
+
+              <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-100 flex justify-end space-x-2">
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={() => setDeleteConfirmItem(null)}
+                  className="px-4 py-2 border border-gray-300 rounded-xl font-semibold hover:bg-gray-100 transition cursor-pointer text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={async () => {
+                    try {
+                      setDeleting(true);
+                      setDeleteError(null);
+                      await deleteItem(deleteConfirmItem.Item_No);
+                      setDeleteConfirmItem(null);
+                      await fetchItems();
+                    } catch (err: any) {
+                      setDeleteError(err.message || 'Failed to delete item.');
+                    } finally {
+                      setDeleting(false);
+                    }
+                  }}
+                  className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold transition disabled:opacity-50 cursor-pointer text-xs flex items-center space-x-1.5"
+                >
+                  {deleting ? (
+                    <span>Deleting...</span>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete Item</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </AppLayout>
   );

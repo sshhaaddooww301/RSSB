@@ -77,3 +77,24 @@ async def update_item(item_no: str, body: ItemUpdate, request: Request, user: di
         return ApiResponse(message="Item updated successfully", data=result)
     except GraphClientError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.delete("/{item_no}")
+async def delete_item(item_no: str, request: Request, user: dict = Depends(require_roles("ADMIN", "MANAGER"))):
+    existing = await excel_service.get_item_by_no(item_no)
+    if not existing:
+        raise HTTPException(status_code=404, detail=f"Item {item_no} not found")
+    try:
+        result = await excel_service.delete_item(item_no)
+        await excel_service.create_audit_log({
+            "User": user.get("Username", ""),
+            "Action": "Delete Item",
+            "Module": "Items",
+            "Item_No": item_no,
+            "Details": f"Deleted item {item_no} ({existing.get('Item_Name', '')})",
+            "IP_Address": request.client.host if request.client else "",
+        })
+        return ApiResponse(message="Item deleted successfully", data=result)
+    except GraphClientError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+

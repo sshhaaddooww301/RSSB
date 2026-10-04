@@ -330,6 +330,36 @@ class GraphClient:
         self.mark_synced()
         return result
 
+    async def delete_table_row(
+        self, table_name: str, row_index: int, key_col: Optional[str] = None, key_val: Optional[Any] = None
+    ) -> dict:
+        """Delete a specific row by index/key and invalidate cache."""
+        self.clear_cache(table_name)
+        if self._is_postgres():
+            from services.postgres_client import postgres_client
+            from services.excel_local import TABLE_SCHEMAS
+            if not key_col:
+                cols = TABLE_SCHEMAS.get(table_name, [])
+                key_col = cols[0] if cols else "id"
+                current_data = postgres_client.read_table(table_name)
+                if row_index < len(current_data):
+                    key_val = current_data[row_index].get(key_col)
+            if key_col and key_val is not None:
+                postgres_client.delete_row_by_key(table_name, key_col, key_val)
+            self.mark_synced()
+            return {"success": True}
+
+        if not self._is_configured():
+            from services.excel_local import delete_row
+            delete_row(table_name, row_index)
+            self.mark_synced()
+            return {"success": True}
+
+        url = f"{self._table_rows_url(table_name)}/itemAt(index={row_index})"
+        result = await self._delete(url)
+        self.mark_synced()
+        return result if result else {"success": True}
+
     async def get_row_count(self, table_name: str) -> int:
         """Return the count of data rows in a table."""
         if self._is_postgres():

@@ -189,3 +189,15 @@ def update_row(table_name: str, row_index: int, values: list[Any]) -> None:
     for col_idx, val in enumerate(values, start=1):
         ws.cell(row=excel_row, column=col_idx, value=_sanitize_cell_val(val))
     wb.save(DB_PATH)
+
+
+def delete_row(table_name: str, row_index: int) -> None:
+    initialize_local_excel_if_needed()
+    wb = openpyxl.load_workbook(DB_PATH)
+    if table_name not in wb.sheetnames:
+        return
+    ws = wb[table_name]
+    excel_row = row_index + 2  # 1-based, plus 1 header
+    ws.delete_rows(excel_row, 1)
+    wb.save(DB_PATH)
+
