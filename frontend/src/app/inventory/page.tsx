@@ -15,7 +15,7 @@ import {
 import AppLayout from '@/components/AppLayout';
 import { getItems, createItem, updateItem } from '@/lib/api';
 
-const UNITS = ['QTL', 'KG', 'PKT', 'TIN'];
+const UNITS = ['QTL', 'KG', 'PKT', 'LITRE', 'TIN'];
 
 export default function InventoryPage() {
   const [items, setItems] = useState<any[]>([]);

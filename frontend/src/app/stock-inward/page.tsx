@@ -22,7 +22,7 @@ import {
 import AppLayout from '@/components/AppLayout';
 import { getItems, createStockInward, getStockInward } from '@/lib/api';
 
-const UNITS = ['QTL', 'KG', 'PKT', 'TIN'];
+const UNITS = ['QTL', 'KG', 'PKT', 'LITRE', 'TIN'];
 const PACKAGE_TYPES = [
   { label: 'Bags / Sacks', singular: 'Bag' },
   { label: 'Tins / Cans', singular: 'Tin' },
@@ -36,6 +36,7 @@ const QUICK_SIZES_BY_UNIT: Record<string, number[]> = {
   QTL: [1, 2, 5, 10, 20, 50, 100],
   KG: [5, 10, 20, 25, 30, 50, 100],
   PKT: [6, 12, 24, 50, 100, 200],
+  LITRE: [1, 2, 5, 10, 15, 20, 200],
   TIN: [1, 2, 5, 10, 15, 20, 50],
 };
 
