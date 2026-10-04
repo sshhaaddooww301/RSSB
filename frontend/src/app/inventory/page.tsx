@@ -150,22 +150,22 @@ export default function InventoryPage() {
 
   const openAddModal = () => {
     setEditingItem(null);
-    setCalcMode('package');
+    setCalcMode('direct');
     setPackageType('Bags / Sacks');
-    setPackCount('100');
+    setPackCount('');
     setPackSize('30');
     setModalForm({
       Item_No: '',
       Item_Name: '',
       SKU: '',
       Unit: 'QTL',
-      Opening_Qty: '3000',
-      Current_Stock: '3000',
+      Opening_Qty: '0',
+      Current_Stock: '0',
       Langar_Qty: '0',
       Minimum_Stock: '20',
       Critical_Stock: '5',
       Status: 'Active',
-      Remarks: '100 Bags @ 30 QTL/bag',
+      Remarks: '',
     });
     setModalError(null);
     setIsModalOpen(true);
@@ -808,7 +808,7 @@ export default function InventoryPage() {
                       <label className="block text-xs font-bold text-gray-800 mb-1">
                         {editingItem
                           ? `Current Stock in Hand (${modalForm.Unit})`
-                          : `Total Initial Stock Quantity (${modalForm.Unit})`}{' '}
+                          : `Initial Opening Stock (${modalForm.Unit}) — keep 0 if inwarding later`}{' '}
                         <span className="text-red-500">*</span>
                       </label>
                       <input
@@ -819,13 +819,18 @@ export default function InventoryPage() {
                           setModalForm({
                             ...modalForm,
                             Current_Stock: e.target.value,
-                            Opening_Qty: editingItem ? modalForm.Opening_Qty : e.target.value,
+                            Opening_Qty: e.target.value,
                           })
                         }
-                        placeholder="e.g. 3000"
+                        placeholder="0"
                         className="w-full max-w-sm px-3 py-2 bg-white border-2 border-red-300 rounded-xl font-bold text-gray-900 focus:ring-2 focus:ring-red-500/20"
                         required
                       />
+                      {!editingItem && (
+                        <p className="text-[11px] text-gray-500 mt-1">
+                          💡 Note: Keep 0 if you plan to record incoming stock through <strong>Stock Inward</strong> so that stock is not double counted.
+                        </p>
+                      )}
                     </div>
                   )}
 
