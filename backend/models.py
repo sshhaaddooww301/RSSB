@@ -141,6 +141,26 @@ class StockInwardCreate(BaseModel):
         return v
 
 
+class StockInwardUpdate(BaseModel):
+    Inward_Date: Optional[str] = None
+    Item_No: Optional[str] = None
+    Item_Name: Optional[str] = None
+    SKU: Optional[str] = None
+    Unit: Optional[str] = None
+    Quantity: Optional[float] = None
+    Supplier: Optional[str] = None
+    Invoice_No: Optional[str] = None
+    Storage_Location: Optional[str] = None
+    Remarks: Optional[str] = None
+
+    @field_validator("Quantity")
+    @classmethod
+    def qty_positive(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and v <= 0:
+            raise ValueError("Quantity must be greater than 0")
+        return v
+
+
 class StockInward(BaseModel):
     Transaction_ID: str = ""
     Inward_Date: str = ""

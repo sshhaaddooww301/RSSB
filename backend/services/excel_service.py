@@ -321,6 +321,71 @@ async def get_all_inward() -> list[dict]:
     return await graph_client.get_table_data(settings.TABLE_STOCK_INWARD)
 
 
+async def update_stock_inward(transaction_id: str, data: dict, username: str = "") -> dict:
+    row_idx = await graph_client.find_row_index(
+        settings.TABLE_STOCK_INWARD, "Transaction_ID", transaction_id
+    )
+    if row_idx is None:
+        raise GraphClientError(f"Stock Inward transaction {transaction_id} not found", 404)
+
+    rows = await graph_client.get_table_data(settings.TABLE_STOCK_INWARD)
+    existing = None
+    for r in rows:
+        if str(r.get("Transaction_ID", "")).strip() == str(transaction_id).strip():
+            existing = r
+            break
+
+    if not existing:
+        raise GraphClientError(f"Stock Inward transaction {transaction_id} not found", 404)
+
+    inward_date = data.get("Inward_Date", existing.get("Inward_Date", _today_str()))
+    item_no = str(data.get("Item_No", existing.get("Item_No", ""))).strip()
+    item_name = data.get("Item_Name", existing.get("Item_Name", ""))
+    sku = data.get("SKU", existing.get("SKU", ""))
+    item_unit = data.get("Unit", existing.get("Unit", "KG"))
+    quantity = _to_float(data.get("Quantity", existing.get("Quantity", 0)))
+    supplier = data.get("Supplier", existing.get("Supplier", ""))
+    invoice_no = data.get("Invoice_No", existing.get("Invoice_No", ""))
+    storage_location = data.get("Storage_Location", existing.get("Storage_Location", ""))
+    remarks = data.get("Remarks", existing.get("Remarks", ""))
+    created_by = existing.get("Created_By", username or "admin")
+    created_at = existing.get("Created_At", _now_str())
+
+    values = [
+        transaction_id,
+        inward_date,
+        item_no,
+        item_name,
+        sku,
+        item_unit,
+        quantity,
+        supplier,
+        invoice_no,
+        storage_location,
+        remarks,
+        created_by,
+        created_at,
+    ]
+    await graph_client.update_table_row(settings.TABLE_STOCK_INWARD, row_idx, values)
+    return {"Transaction_ID": transaction_id, "updated": True}
+
+
+async def delete_stock_inward(transaction_id: str) -> dict:
+    row_idx = await graph_client.find_row_index(
+        settings.TABLE_STOCK_INWARD, "Transaction_ID", transaction_id
+    )
+    if row_idx is None:
+        raise GraphClientError(f"Stock Inward transaction {transaction_id} not found", 404)
+
+    await graph_client.delete_table_row(
+        settings.TABLE_STOCK_INWARD,
+        row_index=row_idx,
+        key_col="Transaction_ID",
+        key_val=transaction_id,
+    )
+    return {"Transaction_ID": transaction_id, "deleted": True}
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # BARTAN INWARD
 # ═══════════════════════════════════════════════════════════════════════
