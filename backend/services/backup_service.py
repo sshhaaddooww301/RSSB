@@ -211,9 +211,81 @@ async def save_daily_backup_snapshot() -> str:
     except Exception as e:
         logger.warning("OneDrive backup upload skipped or failed: %s", e)
 
+    # Also attempt auto-dispatch email to configured Gmail (vyash2110@gmail.com)
+    try:
+        if settings.BACKUP_EMAIL:
+            send_backup_email(settings.BACKUP_EMAIL, filename, excel_bytes)
+    except Exception as e:
+        logger.warning("Automated email backup dispatch skipped: %s", e)
+
     # Cleanup old backups (keep latest 45 days)
     await cleanup_old_backups(max_days=45)
     return filename
+
+
+def send_backup_email(
+    recipient: str,
+    filename: str,
+    excel_bytes: bytes,
+) -> bool:
+    """Send the Excel backup attachment to the configured recipient email via SMTP."""
+    smtp_user = settings.SMTP_USER
+    smtp_pass = settings.SMTP_PASSWORD
+    if not smtp_user or not smtp_pass:
+        logger.info("SMTP credentials not configured — skipping direct email dispatch to %s.", recipient)
+        return False
+
+    try:
+        import smtplib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+        from email.mime.application import MIMEApplication
+
+        msg = MIMEMultipart()
+        msg["From"] = settings.SMTP_FROM or smtp_user
+        msg["To"] = recipient
+        msg["Subject"] = f"📊 RSSB Langar JSR — Daily Database Backup ({datetime.now(timezone.utc).strftime('%d-%b-%Y')})"
+
+        body_html = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+            <div style="max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+                <h2 style="color: #991b1b; margin-top: 0;">RSSB Langar Jamshedpur</h2>
+                <p>Radha Soami Ji,</p>
+                <p>The automated daily database backup for <strong>{datetime.now(timezone.utc).strftime('%d %B %Y')}</strong> has been successfully generated.</p>
+                
+                <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #991b1b;">
+                    <p style="margin: 4px 0;"><strong>📁 Backup File:</strong> {filename}</p>
+                    <p style="margin: 4px 0;"><strong>📦 Size:</strong> {len(excel_bytes) / 1024:.1f} KB</p>
+                    <p style="margin: 4px 0;"><strong>🕒 Time (UTC):</strong> {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}</p>
+                </div>
+                
+                <p>The complete multi-sheet Excel spreadsheet containing all Stock, Inward, Outward, Bartan, and User records is attached to this email.</p>
+                
+                <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+                <p style="font-size: 11px; color: #64748b;">This is an automated message from the RSSB Langar Inventory Management System.</p>
+            </div>
+        </body>
+        </html>
+        """
+        msg.attach(MIMEText(body_html, "html"))
+
+        # Attach Excel file
+        part = MIMEApplication(excel_bytes, Name=filename)
+        part["Content-Disposition"] = f'attachment; filename="{filename}"'
+        msg.attach(part)
+
+        # Send via SMTP
+        with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=30) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.send_message(msg)
+
+        logger.info("✅ Daily backup email successfully sent to %s with attachment %s", recipient, filename)
+        return True
+    except Exception as e:
+        logger.error("❌ Failed to send backup email to %s: %s", recipient, e)
+        return False
 
 
 async def cleanup_old_backups(max_days: int = 45):

@@ -40,6 +40,14 @@ class Settings:
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"))
     ALGORITHM: str = "HS256"
 
+    # Backup & Notification Email
+    BACKUP_EMAIL: str = os.getenv("BACKUP_EMAIL", "vyash2110@gmail.com")
+    SMTP_SERVER: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER: str = os.getenv("SMTP_USER", os.getenv("EMAIL_USER", ""))
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", os.getenv("EMAIL_PASSWORD", ""))
+    SMTP_FROM: str = os.getenv("SMTP_FROM", "RSSB Langar Backup <noreply@rssb-langar.org>")
+
     @property
     def is_production(self) -> bool:
         return self.APP_ENV.lower() == "production"

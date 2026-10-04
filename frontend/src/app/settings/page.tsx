@@ -18,6 +18,7 @@ import {
   History,
   Sparkles,
   Clock,
+  Mail,
 } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
 import {
@@ -29,6 +30,7 @@ import {
   downloadExcelBackup,
   downloadJsonBackup,
   triggerManualBackup,
+  emailBackupNow,
   getBackupList,
   downloadHistoricBackupFile,
 } from '@/lib/api';
@@ -148,6 +150,25 @@ export default function SettingsPage() {
       alert(err.message || 'Failed to download backup file');
     } finally {
       setBackupDownloading(null);
+    }
+  };
+
+  const [emailingBackup, setEmailingBackup] = useState(false);
+
+  const handleEmailBackup = async () => {
+    try {
+      setEmailingBackup(true);
+      setBackupMessage(null);
+      const res = await emailBackupNow('vyash2110@gmail.com');
+      if (res.success) {
+        setBackupMessage({ type: 'success', text: res.message || 'Backup successfully emailed to vyash2110@gmail.com!' });
+      } else {
+        setBackupMessage({ type: 'error', text: res.message || 'Failed to email backup.' });
+      }
+    } catch (err: any) {
+      setBackupMessage({ type: 'error', text: err.message || 'Failed to email backup.' });
+    } finally {
+      setEmailingBackup(false);
     }
   };
 
@@ -366,6 +387,19 @@ export default function SettingsPage() {
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${backupTriggering ? 'animate-spin' : ''}`} />
                       <span>{backupTriggering ? 'Saving Snapshot...' : 'Take Snapshot Now'}</span>
+                    </button>
+                  )}
+
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={handleEmailBackup}
+                      disabled={emailingBackup}
+                      className="inline-flex items-center space-x-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer disabled:opacity-50"
+                      title="Send backup attachment to vyash2110@gmail.com"
+                    >
+                      <Mail className={`w-3.5 h-3.5 ${emailingBackup ? 'animate-bounce' : ''}`} />
+                      <span>{emailingBackup ? 'Sending Email...' : 'Email to vyash2110@gmail.com'}</span>
                     </button>
                   )}
                 </div>

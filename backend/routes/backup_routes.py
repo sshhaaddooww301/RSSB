@@ -95,6 +95,46 @@ async def trigger_manual_backup(
         raise HTTPException(status_code=500, detail=f"Manual backup creation failed: {str(e)}")
 
 
+@router.post("/email-now")
+async def email_backup_now(
+    request: Request,
+    body: dict = None,
+    user: dict = Depends(require_roles("ADMIN")),
+):
+    """Generate live Excel backup and email it directly to the configured recipient (vyash2110@gmail.com)."""
+    recipient = (body.get("email") if body else None) or getattr(settings, "BACKUP_EMAIL", "vyash2110@gmail.com")
+    try:
+        data = await backup_service.fetch_all_database_data()
+        excel_bytes = backup_service.generate_excel_backup_bytes(data)
+        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        filename = f"RSSB_Backup_{today_str}.xlsx"
+
+        sent = backup_service.send_backup_email(recipient, filename, excel_bytes)
+        if not sent:
+            if not getattr(settings, "SMTP_USER", "") or not getattr(settings, "SMTP_PASSWORD", ""):
+                return ApiResponse(
+                    success=False,
+                    message=f"SMTP / Gmail App Password not yet configured in server .env. To receive automatic emails at {recipient}, please provide a Gmail App Password."
+                )
+            raise HTTPException(status_code=500, detail=f"Failed to deliver backup email to {recipient}.")
+
+        await excel_service.create_audit_log({
+            "User": user.get("Username", ""),
+            "Action": "Email Backup",
+            "Module": "Database Backup",
+            "Details": f"Emailed backup {filename} to {recipient}",
+            "IP_Address": request.client.host if request.client else "",
+        })
+        return ApiResponse(
+            message=f"Backup successfully emailed to {recipient}!",
+            data={"recipient": recipient, "filename": filename},
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to email backup: {str(e)}")
+
+
 @router.get("/list")
 async def list_server_backups(user: dict = Depends(require_roles("ADMIN", "MANAGER"))):
     """List available automated daily backups on the server."""
