@@ -9,11 +9,16 @@ import {
   Shield,
   Bell,
   Sliders,
+  Lock,
 } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
-import { getSettings, updateSetting } from '@/lib/api';
+import { getSettings, updateSetting, getCurrentUser, isUserAdmin, isUserViewer } from '@/lib/api';
 
 export default function SettingsPage() {
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const isAdmin = isUserAdmin(currentUser);
+  const isViewer = isUserViewer(currentUser);
+
   const [settingsList, setSettingsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -50,10 +55,16 @@ export default function SettingsPage() {
 
   useEffect(() => {
     fetchSettings();
+    const u = getCurrentUser();
+    if (u) setCurrentUser(u);
   }, []);
 
   const handleSaveAll = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdmin) {
+      setMessage('Admin privileges required to save system settings.');
+      return;
+    }
     try {
       setSaving(true);
       setMessage(null);
@@ -72,6 +83,21 @@ export default function SettingsPage() {
   return (
     <AppLayout>
       <div className="space-y-6 max-w-5xl mx-auto pb-12">
+        {/* Read-only notice for non-admin roles */}
+        {!isAdmin && (
+          <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-2xl flex items-center justify-between text-xs text-amber-900 shadow-2xs">
+            <div className="flex items-center space-x-2.5">
+              <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                <strong>Admin Privileges Required:</strong> System configuration and stock thresholds can only be modified by Administrator accounts.
+              </span>
+            </div>
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900 uppercase">
+              View Only
+            </span>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center space-x-3.5">
           <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center text-red-600">
@@ -107,9 +133,10 @@ export default function SettingsPage() {
                     Default Unit for New Items
                   </label>
                   <select
+                    disabled={!isAdmin}
                     value={form.DEFAULT_UNIT}
                     onChange={(e) => setForm({ ...form, DEFAULT_UNIT: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl font-bold text-red-600"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl font-bold text-red-600 disabled:bg-gray-100 disabled:opacity-75"
                   >
                     <option value="KG">KG</option>
                     <option value="QTL">QTL</option>
@@ -127,9 +154,10 @@ export default function SettingsPage() {
                     Allow Negative Available Stock
                   </label>
                   <select
+                    disabled={!isAdmin}
                     value={form.ALLOW_NEGATIVE_STOCK}
                     onChange={(e) => setForm({ ...form, ALLOW_NEGATIVE_STOCK: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl font-medium"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl font-medium disabled:bg-gray-100 disabled:opacity-75"
                   >
                     <option value="FALSE">FALSE (Strict - Block Outward on insufficient stock)</option>
                     <option value="TRUE">TRUE (Allow temporary negative variance)</option>
@@ -143,10 +171,11 @@ export default function SettingsPage() {
                     Default Minimum Stock Threshold
                   </label>
                   <input
+                    disabled={!isAdmin}
                     type="number"
                     value={form.DEFAULT_MIN_STOCK}
                     onChange={(e) => setForm({ ...form, DEFAULT_MIN_STOCK: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl font-medium"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl font-medium disabled:bg-gray-100 disabled:opacity-75"
                   />
                 </div>
 
@@ -155,10 +184,11 @@ export default function SettingsPage() {
                     Default Critical Stock Threshold
                   </label>
                   <input
+                    disabled={!isAdmin}
                     type="number"
                     value={form.DEFAULT_CRITICAL_STOCK}
                     onChange={(e) => setForm({ ...form, DEFAULT_CRITICAL_STOCK: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl font-medium text-red-600"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl font-medium text-red-600 disabled:bg-gray-100 disabled:opacity-75"
                   />
                 </div>
               </div>
@@ -186,14 +216,21 @@ export default function SettingsPage() {
           </div>
 
           <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={saving}
-              className="inline-flex items-center space-x-1.5 px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold shadow-xs transition disabled:opacity-50"
-            >
-              <Save className="w-4 h-4" />
-              <span>{saving ? 'Saving...' : 'Save Settings'}</span>
-            </button>
+            {isAdmin ? (
+              <button
+                type="submit"
+                disabled={saving}
+                className="inline-flex items-center space-x-1.5 px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold shadow-xs transition disabled:opacity-50 cursor-pointer"
+              >
+                <Save className="w-4 h-4" />
+                <span>{saving ? 'Saving...' : 'Save Settings'}</span>
+              </button>
+            ) : (
+              <span className="inline-flex items-center space-x-1.5 px-5 py-2.5 bg-gray-100 text-gray-400 rounded-xl text-xs font-semibold border border-gray-200 cursor-not-allowed">
+                <Lock className="w-4 h-4" />
+                <span>Read-Only (Admin Access Required)</span>
+              </span>
+            )}
           </div>
         </form>
       </div>

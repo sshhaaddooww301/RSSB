@@ -136,6 +136,7 @@ const emptyForm = {
 
 export default function BartanInwardPage() {
   const user = getCurrentUser() || { full_name: 'Admin', username: 'admin' };
+  const isViewer = (user.role || '').toUpperCase() === 'VIEWER';
 
   const [formData, setFormData] = useState({ ...emptyForm });
   const [saving, setSaving] = useState(false);
@@ -293,6 +294,26 @@ export default function BartanInwardPage() {
                 <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
               )}
               <span>{message.text}</span>
+            </div>
+          )}
+
+          {/* Viewer Mode Banner */}
+          {isViewer && (
+            <div className="mb-5 bg-blue-50/90 border-2 border-blue-200 p-4 rounded-2xl flex items-center justify-between text-xs text-blue-900 shadow-xs">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Warehouse className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="font-bold text-blue-950 text-sm">Viewer Mode (Read-Only)</p>
+                  <p className="text-blue-700 mt-0.5">
+                    You have view-only access. You can view all recent bartan inward records, but creating new entries is disabled.
+                  </p>
+                </div>
+              </div>
+              <span className="px-3 py-1 bg-blue-200/80 text-blue-900 rounded-lg font-black uppercase tracking-wider text-[11px] shrink-0">
+                View Only
+              </span>
             </div>
           )}
 
@@ -495,28 +516,35 @@ export default function BartanInwardPage() {
                     <button
                       type="button"
                       onClick={handleReset}
-                      className="flex items-center space-x-2 px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-300 transition"
+                      disabled={isViewer}
+                      className="flex items-center space-x-2 px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-sm font-medium hover:bg-slate-50 hover:border-slate-300 transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <RotateCcw className="w-4 h-4" />
                       <span>Reset</span>
                     </button>
-                    <button
-                      type="submit"
-                      disabled={saving}
-                      className="flex-1 flex items-center justify-center space-x-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#c8102e] to-[#dc2626] text-white text-sm font-semibold hover:from-[#b91c1c] hover:to-[#c8102e] transition shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      {saving ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                          <span>Saving…</span>
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-4 h-4" />
-                          <span>Save Record</span>
-                        </>
-                      )}
-                    </button>
+                    {isViewer ? (
+                      <div className="flex-1 flex items-center justify-center space-x-2 px-5 py-2.5 rounded-xl bg-slate-100 text-slate-400 border border-slate-200 text-sm font-bold cursor-not-allowed">
+                        <span>🔒 Read-Only (Saving Disabled for Viewer)</span>
+                      </div>
+                    ) : (
+                      <button
+                        type="submit"
+                        disabled={saving}
+                        className="flex-1 flex items-center justify-center space-x-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#c8102e] to-[#dc2626] text-white text-sm font-semibold hover:from-[#b91c1c] hover:to-[#c8102e] transition shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {saving ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                            <span>Saving…</span>
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4" />
+                            <span>Save Record</span>
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </form>
               </div>

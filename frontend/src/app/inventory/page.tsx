@@ -19,18 +19,30 @@ import {
   Info,
   Calculator,
   Layers,
+  Shield,
+  Eye,
 } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
-import { getItems, createItem, updateItem, deleteItem, createStockInward } from '@/lib/api';
+import {
+  getItems,
+  createItem,
+  updateItem,
+  deleteItem,
+  createStockInward,
+  getCurrentUser,
+  isUserViewer,
+  isUserAdmin,
+  canUserEdit,
+} from '@/lib/api';
 
 const UNITS = ['QTL', 'KG', 'PKT', 'LITRE', 'TIN'];
 const PACKAGE_TYPES = [
-  { label: 'Bags / Sacks', singular: 'Bag' },
-  { label: 'Tins / Cans', singular: 'Tin' },
-  { label: 'Packets / Pouches', singular: 'Packet' },
-  { label: 'Boxes / Cartons', singular: 'Box' },
-  { label: 'Drums / Barrels', singular: 'Drum' },
-  { label: 'Units / Pieces', singular: 'Unit' },
+  { label: 'Bags / Sacks', singular: 'Bag', defaultSize: '30', defaultUnit: 'KG', quickSizes: [5, 10, 20, 25, 30, 50, 100] },
+  { label: 'Tins / Cans', singular: 'Tin', defaultSize: '15', defaultUnit: 'LITRE', quickSizes: [1, 2, 5, 10, 15, 20] },
+  { label: 'Packets / Pouches', singular: 'Packet', defaultSize: '1', defaultUnit: 'PKT', quickSizes: [0.5, 1, 2, 5, 10, 25] },
+  { label: 'Boxes / Cartons', singular: 'Box', defaultSize: '24', defaultUnit: 'PKT', quickSizes: [6, 12, 20, 24, 48, 100] },
+  { label: 'Drums / Barrels', singular: 'Drum', defaultSize: '200', defaultUnit: 'LITRE', quickSizes: [50, 100, 200, 250] },
+  { label: 'Units / Pieces', singular: 'Unit', defaultSize: '1', defaultUnit: 'KG', quickSizes: [1, 2, 5, 10, 50] },
 ];
 
 const QUICK_SIZES_BY_UNIT: Record<string, number[]> = {
@@ -42,6 +54,11 @@ const QUICK_SIZES_BY_UNIT: Record<string, number[]> = {
 };
 
 export default function InventoryPage() {
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const isViewer = isUserViewer(currentUser);
+  const isAdmin = isUserAdmin(currentUser);
+  const canEdit = canUserEdit(currentUser);
+
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -94,7 +111,20 @@ export default function InventoryPage() {
 
   useEffect(() => {
     fetchItems();
+    const u = getCurrentUser();
+    if (u) setCurrentUser(u);
   }, []);
+
+  const handleSelectPackageType = (typeLabel: string) => {
+    setPackageType(typeLabel);
+    const selectedPkg = PACKAGE_TYPES.find((p) => p.label === typeLabel);
+    if (selectedPkg) {
+      setPackSize(selectedPkg.defaultSize);
+      if (modalForm.Unit !== selectedPkg.defaultUnit && modalForm.Unit !== 'QTL') {
+        setModalForm((prev) => ({ ...prev, Unit: selectedPkg.defaultUnit }));
+      }
+    }
+  };
 
   // Update calculated quantity when packCount, packSize or packageType changes
   useEffect(() => {
@@ -256,14 +286,28 @@ export default function InventoryPage() {
   const inStockCount = items.filter((i) => i.Stock_Status === 'IN STOCK').length;
   const lowStockCount = items.filter((i) => i.Stock_Status === 'LOW STOCK').length;
   const criticalStockCount = items.filter((i) => i.Stock_Status === 'CRITICAL').length;
-
-  const quickSizes = QUICK_SIZES_BY_UNIT[modalForm.Unit] || [5, 10, 20, 25, 30, 50];
   const activePackage = PACKAGE_TYPES.find((p) => p.label === packageType);
   const containerSingular = activePackage ? activePackage.singular : 'Container';
+  const quickSizes = activePackage?.quickSizes || QUICK_SIZES_BY_UNIT[modalForm.Unit] || [5, 10, 20, 25, 30, 50];
 
   return (
     <AppLayout>
       <div className="space-y-5 sm:space-y-6 max-w-[1600px] mx-auto pb-12">
+        {/* Read-only notice for Viewer role */}
+        {isViewer && (
+          <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-2xl flex items-center justify-between text-xs text-amber-900 shadow-2xs">
+            <div className="flex items-center space-x-2.5">
+              <Eye className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                <strong>Viewer Access Mode:</strong> You are logged in with Read-Only permissions. Adding, editing, and deleting inventory items are disabled.
+              </span>
+            </div>
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900 uppercase">
+              View Only
+            </span>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center space-x-3.5">
@@ -284,13 +328,15 @@ export default function InventoryPage() {
           </div>
 
           <div className="flex items-center gap-2.5">
-            <button
-              onClick={openAddModal}
-              className="inline-flex items-center justify-center space-x-2 px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>+ Add New Item</span>
-            </button>
+            {!isViewer && (
+              <button
+                onClick={openAddModal}
+                className="inline-flex items-center justify-center space-x-2 px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Add New Item</span>
+              </button>
+            )}
             <Link
               href="/stock-inward"
               className="inline-flex items-center justify-center space-x-2 px-4 py-2.5 bg-white border border-red-200 text-red-700 hover:bg-red-50 rounded-xl text-xs font-semibold shadow-2xs transition"
@@ -459,31 +505,39 @@ export default function InventoryPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end space-x-1.5">
-                        <Link
-                          href="/stock-inward"
-                          className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-xs font-bold inline-flex items-center gap-1 transition shadow-2xs"
-                          title="Inward more stock"
-                        >
-                          <ArrowDownLeft className="w-3.5 h-3.5" />
-                          <span>+Inward</span>
-                        </Link>
-                        <button
-                          onClick={() => openEditModal(item)}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
-                          title="Edit Item Details"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setDeleteConfirmItem(item);
-                            setDeleteError(null);
-                          }}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
-                          title="Delete Item"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {!isViewer && (
+                          <Link
+                            href="/stock-inward"
+                            className="px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-xs font-bold inline-flex items-center gap-1 transition shadow-2xs"
+                            title="Inward more stock"
+                          >
+                            <ArrowDownLeft className="w-3.5 h-3.5" />
+                            <span>+Inward</span>
+                          </Link>
+                        )}
+                        {!isViewer ? (
+                          <>
+                            <button
+                              onClick={() => openEditModal(item)}
+                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                              title="Edit Item Details"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setDeleteConfirmItem(item);
+                                setDeleteError(null);
+                              }}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                              title="Delete Item"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-[10px] text-gray-400 font-semibold italic">View Only</span>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -668,7 +722,7 @@ export default function InventoryPage() {
                             </label>
                             <select
                               value={packageType}
-                              onChange={(e) => setPackageType(e.target.value)}
+                              onChange={(e) => handleSelectPackageType(e.target.value)}
                               className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl font-medium"
                             >
                               {PACKAGE_TYPES.map((p) => (

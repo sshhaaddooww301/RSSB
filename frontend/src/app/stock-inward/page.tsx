@@ -18,18 +18,29 @@ import {
   Plus,
   Trash2,
   Package,
+  Shield,
+  Eye,
 } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
-import { getItems, createStockInward, getStockInward } from '@/lib/api';
+import { getItems, createStockInward, getStockInward, getCurrentUser, isUserViewer } from '@/lib/api';
 
 const UNITS = ['QTL', 'KG', 'PKT', 'LITRE', 'TIN'];
-const PACKAGE_TYPES = [
-  { label: 'Bags / Sacks', singular: 'Bag' },
-  { label: 'Tins / Cans', singular: 'Tin' },
-  { label: 'Packets / Pouches', singular: 'Packet' },
-  { label: 'Boxes / Cartons', singular: 'Box' },
-  { label: 'Drums / Barrels', singular: 'Drum' },
-  { label: 'Units / Pieces', singular: 'Unit' },
+
+interface PackageTypeConfig {
+  label: string;
+  singular: string;
+  defaultSize: string;
+  defaultUnit: string;
+  quickSizes: number[];
+}
+
+const PACKAGE_TYPES: PackageTypeConfig[] = [
+  { label: 'Bags / Sacks', singular: 'Bag', defaultSize: '30', defaultUnit: 'KG', quickSizes: [5, 10, 20, 25, 30, 50, 100] },
+  { label: 'Tins / Cans', singular: 'Tin', defaultSize: '15', defaultUnit: 'LITRE', quickSizes: [1, 2, 5, 10, 15, 20] },
+  { label: 'Packets / Pouches', singular: 'Packet', defaultSize: '1', defaultUnit: 'PKT', quickSizes: [0.5, 1, 2, 5, 10, 25] },
+  { label: 'Boxes / Cartons', singular: 'Box', defaultSize: '24', defaultUnit: 'PKT', quickSizes: [6, 12, 20, 24, 48, 100] },
+  { label: 'Drums / Barrels', singular: 'Drum', defaultSize: '200', defaultUnit: 'LITRE', quickSizes: [50, 100, 200, 250] },
+  { label: 'Units / Pieces', singular: 'Unit', defaultSize: '1', defaultUnit: 'KG', quickSizes: [1, 2, 5, 10, 50] },
 ];
 
 const QUICK_SIZES_BY_UNIT: Record<string, number[]> = {
@@ -56,6 +67,8 @@ interface BulkRow {
 
 export default function StockInwardPage() {
   const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isViewer, setIsViewer] = useState(false);
   const [items, setItems] = useState<any[]>([]);
   const [recentInwards, setRecentInwards] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -112,7 +125,37 @@ export default function StockInwardPage() {
 
   useEffect(() => {
     fetchInitialData();
+    const u = getCurrentUser();
+    setCurrentUser(u);
+    if (u && String(u.role).toUpperCase() === 'VIEWER') {
+      setIsViewer(true);
+    }
   }, []);
+
+  const handleSelectPackageType = (ptLabel: string) => {
+    const pkg = PACKAGE_TYPES.find((p) => p.label === ptLabel);
+    if (!pkg) return;
+    setPackageType(pkg.label);
+    setPackSize(pkg.defaultSize);
+
+    // If packCount is empty or zero, set default sensible count
+    if (!packCount || parseFloat(packCount) <= 0) {
+      setPackCount(pkg.label === 'Tins / Cans' ? '20' : pkg.label === 'Drums / Barrels' ? '5' : '100');
+    }
+
+    // Intelligently sync base unit
+    setFormData((prev) => {
+      let unit = prev.Unit;
+      if (pkg.label === 'Tins / Cans' || pkg.label === 'Drums / Barrels') {
+        if (unit === 'QTL' || unit === 'PKT') unit = 'LITRE';
+      } else if (pkg.label === 'Packets / Pouches' || pkg.label === 'Boxes / Cartons') {
+        if (unit === 'QTL' || unit === 'LITRE') unit = 'PKT';
+      } else if (pkg.label === 'Bags / Sacks') {
+        if (unit === 'LITRE' || unit === 'TIN') unit = 'KG';
+      }
+      return { ...prev, Unit: unit };
+    });
+  };
 
   // Update single form calculated quantity when packCount, packSize or packageType changes
   useEffect(() => {
@@ -127,7 +170,7 @@ export default function StockInwardPage() {
         ...prev,
         Quantity: total > 0 ? String(total) : '',
         Remarks:
-          count > 0 && size > 0 && (!prev.Remarks || prev.Remarks.includes('@') || prev.Remarks.includes('Bags') || prev.Remarks.includes('Tins'))
+          count > 0 && size > 0 && (!prev.Remarks || prev.Remarks.includes('@') || prev.Remarks.includes('Bags') || prev.Remarks.includes('Tins') || prev.Remarks.includes('Boxes') || prev.Remarks.includes('Drums') || prev.Remarks.includes('Packets'))
             ? `${count} ${pkgLabel}s @ ${size} ${prev.Unit}/${pkgLabel.toLowerCase()}`
             : prev.Remarks,
       }));
@@ -374,6 +417,25 @@ export default function StockInwardPage() {
           }
         }
 
+        // When container type is changed in bulk row
+        if (field === 'packageType') {
+          const pkg = PACKAGE_TYPES.find((p) => p.label === val);
+          if (pkg) {
+            updated.packageType = pkg.label;
+            updated.packSize = pkg.defaultSize;
+            if (!updated.packCount || parseFloat(updated.packCount) <= 0) {
+              updated.packCount = pkg.label === 'Tins / Cans' ? '20' : pkg.label === 'Drums / Barrels' ? '5' : '100';
+            }
+            if (pkg.label === 'Tins / Cans' || pkg.label === 'Drums / Barrels') {
+              if (updated.Unit === 'QTL' || updated.Unit === 'PKT') updated.Unit = 'LITRE';
+            } else if (pkg.label === 'Packets / Pouches' || pkg.label === 'Boxes / Cartons') {
+              if (updated.Unit === 'QTL' || updated.Unit === 'LITRE') updated.Unit = 'PKT';
+            } else if (pkg.label === 'Bags / Sacks') {
+              if (updated.Unit === 'LITRE' || updated.Unit === 'TIN') updated.Unit = 'KG';
+            }
+          }
+        }
+
         // Auto calculate quantity in package mode
         if (updated.calcMode === 'package') {
           const count = parseFloat(updated.packCount) || 0;
@@ -394,6 +456,7 @@ export default function StockInwardPage() {
 
   const handleSaveBulk = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isViewer) return;
     const validRows = bulkRows.filter((r) => r.Item_No && parseFloat(r.Quantity) > 0);
     if (validRows.length === 0) {
       setMessage({ type: 'error', text: 'Please add at least one valid item with positive quantity.' });
@@ -456,9 +519,9 @@ export default function StockInwardPage() {
     }
   };
 
-  const quickSizes = QUICK_SIZES_BY_UNIT[formData.Unit] || [5, 10, 20, 25, 30, 50];
   const activePackage = PACKAGE_TYPES.find((p) => p.label === packageType);
   const containerSingular = activePackage ? activePackage.singular : 'Container';
+  const quickSizes = activePackage?.quickSizes || QUICK_SIZES_BY_UNIT[formData.Unit] || [5, 10, 20, 25, 30, 50];
 
   return (
     <AppLayout>
@@ -532,6 +595,26 @@ export default function StockInwardPage() {
               <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
             )}
             <span>{message.text}</span>
+          </div>
+        )}
+
+        {/* Read-Only Viewer Notice */}
+        {isViewer && (
+          <div className="bg-blue-50/90 border-2 border-blue-200 p-4 rounded-2xl flex items-center justify-between text-xs text-blue-900 shadow-xs">
+            <div className="flex items-center space-x-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <Eye className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="font-bold text-blue-950 text-sm">Viewer Access (Read-Only Mode)</p>
+                <p className="text-blue-700 mt-0.5">
+                  You are signed in with the <strong>VIEWER</strong> role. You can view existing stock inventory and inward records below, but creating or modifying inward transactions is disabled.
+                </p>
+              </div>
+            </div>
+            <span className="px-3 py-1 bg-blue-200/80 text-blue-900 rounded-lg font-black uppercase tracking-wider text-[11px] shrink-0">
+              View Only
+            </span>
           </div>
         )}
 
@@ -731,7 +814,7 @@ export default function StockInwardPage() {
                             <button
                               key={pt.label}
                               type="button"
-                              onClick={() => setPackageType(pt.label)}
+                              onClick={() => handleSelectPackageType(pt.label)}
                               className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
                                 packageType === pt.label
                                   ? 'bg-red-600 text-white shadow-xs'
@@ -753,10 +836,11 @@ export default function StockInwardPage() {
                           <input
                             type="number"
                             step="any"
+                            disabled={isViewer}
                             value={packCount}
                             onChange={(e) => setPackCount(e.target.value)}
                             placeholder="e.g. 100 Bags or 20 Tins"
-                            className="w-full px-3 py-2.5 text-xs bg-white border-2 border-red-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-bold text-gray-900 text-base"
+                            className="w-full px-3 py-2.5 text-xs bg-white border-2 border-red-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-bold text-gray-900 text-base disabled:bg-gray-100 disabled:cursor-not-allowed"
                           />
                         </div>
 
@@ -768,10 +852,11 @@ export default function StockInwardPage() {
                           <input
                             type="number"
                             step="any"
+                            disabled={isViewer}
                             value={packSize}
                             onChange={(e) => setPackSize(e.target.value)}
                             placeholder="e.g. 30 KG or 15 Litres"
-                            className="w-full px-3 py-2.5 text-xs bg-white border-2 border-red-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-bold text-gray-900 text-base"
+                            className="w-full px-3 py-2.5 text-xs bg-white border-2 border-red-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-bold text-gray-900 text-base disabled:bg-gray-100 disabled:cursor-not-allowed"
                           />
                           {/* Quick Size Chips */}
                           <div className="flex flex-wrap gap-1.5 mt-2">
@@ -779,8 +864,9 @@ export default function StockInwardPage() {
                               <button
                                 key={s}
                                 type="button"
+                                disabled={isViewer}
                                 onClick={() => setPackSize(String(s))}
-                                className={`px-2 py-0.5 rounded text-[10px] font-bold border transition cursor-pointer ${
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold border transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                                   packSize === String(s)
                                     ? 'bg-red-600 text-white border-red-600'
                                     : 'bg-white text-gray-700 border-gray-200 hover:border-red-300'
@@ -814,10 +900,11 @@ export default function StockInwardPage() {
                       <input
                         type="number"
                         step="any"
+                        disabled={isViewer}
                         value={formData.Quantity}
                         onChange={(e) => setFormData({ ...formData, Quantity: e.target.value })}
                         placeholder="e.g. 3000"
-                        className="w-full max-w-sm px-3 py-2.5 text-xs bg-white border-2 border-red-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-bold text-gray-900"
+                        className="w-full max-w-sm px-3 py-2.5 text-xs bg-white border-2 border-red-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-bold text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed"
                         required
                       />
                     </div>
@@ -837,9 +924,10 @@ export default function StockInwardPage() {
                       </label>
                       <input
                         type="date"
+                        disabled={isViewer}
                         value={formData.Inward_Date}
                         onChange={(e) => setFormData({ ...formData, Inward_Date: e.target.value })}
-                        className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium text-gray-800"
+                        className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium text-gray-800 disabled:bg-gray-100 disabled:cursor-not-allowed"
                         required
                       />
                     </div>
@@ -851,10 +939,11 @@ export default function StockInwardPage() {
                       </label>
                       <input
                         type="text"
+                        disabled={isViewer}
                         value={formData.Supplier}
                         onChange={(e) => setFormData({ ...formData, Supplier: e.target.value })}
                         placeholder="e.g. Kisan Mandi / Local Vendor"
-                        className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium"
+                        className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium disabled:bg-gray-100 disabled:cursor-not-allowed"
                       />
                     </div>
 
@@ -865,10 +954,11 @@ export default function StockInwardPage() {
                       </label>
                       <input
                         type="text"
+                        disabled={isViewer}
                         value={formData.Invoice_No}
                         onChange={(e) => setFormData({ ...formData, Invoice_No: e.target.value })}
                         placeholder="e.g. INV-8821 or CH-990"
-                        className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium"
+                        className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium disabled:bg-gray-100 disabled:cursor-not-allowed"
                       />
                     </div>
                   </div>
@@ -882,10 +972,11 @@ export default function StockInwardPage() {
                     </label>
                     <input
                       type="text"
+                      disabled={isViewer}
                       value={formData.Storage_Location}
                       onChange={(e) => setFormData({ ...formData, Storage_Location: e.target.value })}
                       placeholder="e.g. Main Kitchen Store Room 1, Rack B"
-                      className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium"
+                      className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium disabled:bg-gray-100 disabled:cursor-not-allowed"
                     />
                   </div>
                   <div>
@@ -894,10 +985,11 @@ export default function StockInwardPage() {
                     </label>
                     <input
                       type="text"
+                      disabled={isViewer}
                       value={formData.Remarks}
                       onChange={(e) => setFormData({ ...formData, Remarks: e.target.value })}
                       placeholder="e.g. 100 Bags @ 30 KG/bag or 20 Tins @ 15 LITRE/tin"
-                      className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium"
+                      className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium disabled:bg-gray-100 disabled:cursor-not-allowed"
                     />
                   </div>
                 </div>
@@ -907,20 +999,27 @@ export default function StockInwardPage() {
                   <button
                     type="button"
                     onClick={handleReset}
-                    className="inline-flex items-center space-x-1.5 px-4 py-2.5 border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl text-xs font-semibold transition cursor-pointer shadow-2xs"
+                    disabled={isViewer}
+                    className="inline-flex items-center space-x-1.5 px-4 py-2.5 border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl text-xs font-semibold transition cursor-pointer shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <RotateCcw className="w-3.5 h-3.5 text-gray-500" />
                     <span>Reset</span>
                   </button>
 
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="inline-flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-xs disabled:opacity-50"
-                  >
-                    <Save className="w-4 h-4" />
-                    <span>{saving ? 'Saving to Excel...' : 'Save Inward Stock'}</span>
-                  </button>
+                  {isViewer ? (
+                    <div className="px-5 py-2.5 bg-gray-100 text-gray-400 border border-gray-200 rounded-xl text-xs font-bold flex items-center gap-2 cursor-not-allowed">
+                      <span>🔒 Read-Only (Saving Disabled for Viewer)</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="inline-flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-xs disabled:opacity-50"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>{saving ? 'Saving to Excel...' : 'Save Inward Stock'}</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </form>
@@ -940,14 +1039,16 @@ export default function StockInwardPage() {
                   Enter supplier & invoice once, then add multiple items with container counts below
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={addBulkRow}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-lg text-xs font-bold transition cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>+ Add Item Row</span>
-              </button>
+              {!isViewer && (
+                <button
+                  type="button"
+                  onClick={addBulkRow}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-lg text-xs font-bold transition cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Add Item Row</span>
+                </button>
+              )}
             </div>
 
             <div className="p-6 space-y-6">
@@ -957,9 +1058,10 @@ export default function StockInwardPage() {
                   <label className="block text-xs font-bold text-gray-700 mb-1">Inward Date *</label>
                   <input
                     type="date"
+                    disabled={isViewer}
                     value={bulkCommon.Inward_Date}
                     onChange={(e) => setBulkCommon({ ...bulkCommon, Inward_Date: e.target.value })}
-                    className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-lg font-medium"
+                    className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-lg font-medium disabled:bg-gray-100 disabled:cursor-not-allowed"
                     required
                   />
                 </div>
@@ -967,30 +1069,33 @@ export default function StockInwardPage() {
                   <label className="block text-xs font-bold text-gray-700 mb-1">Supplier / Mandi</label>
                   <input
                     type="text"
+                    disabled={isViewer}
                     value={bulkCommon.Supplier}
                     onChange={(e) => setBulkCommon({ ...bulkCommon, Supplier: e.target.value })}
                     placeholder="e.g. Kisan Mandi / Local Store"
-                    className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-lg font-medium"
+                    className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-lg font-medium disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">Invoice / Challan No</label>
                   <input
                     type="text"
+                    disabled={isViewer}
                     value={bulkCommon.Invoice_No}
                     onChange={(e) => setBulkCommon({ ...bulkCommon, Invoice_No: e.target.value })}
                     placeholder="e.g. BILL-2026-09"
-                    className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-lg font-medium"
+                    className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-lg font-medium disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1">Storage Location</label>
                   <input
                     type="text"
+                    disabled={isViewer}
                     value={bulkCommon.Storage_Location}
                     onChange={(e) => setBulkCommon({ ...bulkCommon, Storage_Location: e.target.value })}
                     placeholder="e.g. Main Godown / Shed 2"
-                    className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-lg font-medium"
+                    className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-lg font-medium disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -1001,14 +1106,16 @@ export default function StockInwardPage() {
                   <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
                     Invoice Line Items ({bulkRows.length})
                   </h3>
-                  <button
-                    type="button"
-                    onClick={addBulkRow}
-                    className="text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Item Row</span>
-                  </button>
+                  {!isViewer && (
+                    <button
+                      type="button"
+                      onClick={addBulkRow}
+                      className="text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Item Row</span>
+                    </button>
+                  )}
                 </div>
 
                 <div className="overflow-x-auto border border-gray-200 rounded-xl">
@@ -1034,11 +1141,12 @@ export default function StockInwardPage() {
                           <td className="p-2.5">
                             <input
                               type="text"
+                              disabled={isViewer}
                               list={`bulk-item-list-${row.id}`}
                               value={row.Item_No}
                               onChange={(e) => updateBulkRow(row.id, 'Item_No', e.target.value)}
                               placeholder="e.g. 6745"
-                              className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-900"
+                              className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed"
                               required
                             />
                             <datalist id={`bulk-item-list-${row.id}`}>
@@ -1052,17 +1160,19 @@ export default function StockInwardPage() {
                           <td className="p-2.5">
                             <input
                               type="text"
+                              disabled={isViewer}
                               value={row.Item_Name}
                               onChange={(e) => updateBulkRow(row.id, 'Item_Name', e.target.value)}
                               placeholder="Item Name"
-                              className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-medium"
+                              className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-medium disabled:bg-gray-100 disabled:cursor-not-allowed"
                             />
                           </td>
                           <td className="p-2.5">
                             <select
+                              disabled={isViewer}
                               value={row.Unit}
                               onChange={(e) => updateBulkRow(row.id, 'Unit', e.target.value)}
-                              className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-bold"
+                              className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-bold disabled:bg-gray-100 disabled:cursor-not-allowed"
                             >
                               {UNITS.map((u) => (
                                 <option key={u} value={u}>
@@ -1073,9 +1183,10 @@ export default function StockInwardPage() {
                           </td>
                           <td className="p-2.5">
                             <select
+                              disabled={isViewer}
                               value={row.packageType}
                               onChange={(e) => updateBulkRow(row.id, 'packageType', e.target.value)}
-                              className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium"
+                              className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium disabled:bg-gray-100 disabled:cursor-not-allowed"
                             >
                               {PACKAGE_TYPES.map((p) => (
                                 <option key={p.label} value={p.label}>
@@ -1088,47 +1199,51 @@ export default function StockInwardPage() {
                             <input
                               type="number"
                               step="any"
+                              disabled={isViewer}
                               value={row.packCount}
                               onChange={(e) => updateBulkRow(row.id, 'packCount', e.target.value)}
                               placeholder="100"
-                              className="w-full p-2 bg-white border border-red-200 rounded-lg text-xs font-bold"
+                              className="w-full p-2 bg-white border border-red-200 rounded-lg text-xs font-bold disabled:bg-gray-100 disabled:cursor-not-allowed"
                             />
                           </td>
                           <td className="p-2.5">
                             <input
                               type="number"
                               step="any"
+                              disabled={isViewer}
                               value={row.packSize}
                               onChange={(e) => updateBulkRow(row.id, 'packSize', e.target.value)}
                               placeholder="30"
-                              className="w-full p-2 bg-white border border-red-200 rounded-lg text-xs font-bold"
+                              className="w-full p-2 bg-white border border-red-200 rounded-lg text-xs font-bold disabled:bg-gray-100 disabled:cursor-not-allowed"
                             />
                           </td>
                           <td className="p-2.5">
                             <input
                               type="number"
                               step="any"
+                              disabled={isViewer}
                               value={row.Quantity}
                               onChange={(e) => updateBulkRow(row.id, 'Quantity', e.target.value)}
                               placeholder="3000"
-                              className="w-full p-2 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300"
+                              className="w-full p-2 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 disabled:bg-gray-100 disabled:cursor-not-allowed"
                               required
                             />
                           </td>
                           <td className="p-2.5">
                             <input
                               type="text"
+                              disabled={isViewer}
                               value={row.Remarks}
                               onChange={(e) => updateBulkRow(row.id, 'Remarks', e.target.value)}
                               placeholder="Notes"
-                              className="w-full p-2 bg-white border border-gray-200 rounded-lg text-xs"
+                              className="w-full p-2 bg-white border border-gray-200 rounded-lg text-xs disabled:bg-gray-100 disabled:cursor-not-allowed"
                             />
                           </td>
                           <td className="p-2.5 text-center">
                             <button
                               type="button"
                               onClick={() => removeBulkRow(row.id)}
-                              disabled={bulkRows.length === 1}
+                              disabled={isViewer || bulkRows.length === 1}
                               className="p-1.5 text-gray-400 hover:text-red-600 disabled:opacity-30 cursor-pointer"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -1150,6 +1265,7 @@ export default function StockInwardPage() {
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
+                    disabled={isViewer}
                     onClick={() =>
                       setBulkRows([
                         {
@@ -1167,18 +1283,25 @@ export default function StockInwardPage() {
                         },
                       ])
                     }
-                    className="px-4 py-2 border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50 cursor-pointer"
+                    className="px-4 py-2 border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Reset Grid
                   </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="inline-flex items-center space-x-2 px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer disabled:opacity-50"
-                  >
-                    <Save className="w-4 h-4" />
-                    <span>{saving ? 'Saving All to Excel...' : 'Save All Items'}</span>
-                  </button>
+
+                  {isViewer ? (
+                    <div className="px-5 py-2.5 bg-gray-100 text-gray-400 border border-gray-200 rounded-xl text-xs font-bold flex items-center gap-2 cursor-not-allowed">
+                      <span>🔒 Read-Only (Saving Disabled for Viewer)</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="inline-flex items-center space-x-2 px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer disabled:opacity-50"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>{saving ? 'Saving All to Excel...' : 'Save All Items'}</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

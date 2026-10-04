@@ -155,21 +155,38 @@ export default function Sidebar({ lowStockCount = 7, isOpen = false, onClose }: 
         {/* User info & Logout at bottom */}
         <div className="p-4 border-t border-red-500/30 bg-black/10 backdrop-blur-xs shrink-0">
           <div className="flex items-center space-x-3 mb-3 px-2">
-            <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold text-sm border border-white/30 shrink-0">
-              {user.full_name ? user.full_name.charAt(0) : 'A'}
+            <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white font-semibold text-sm border border-white/30 shrink-0 shadow-inner">
+              {user.full_name ? user.full_name.charAt(0).toUpperCase() : 'A'}
             </div>
             <div className="overflow-hidden flex-1">
-              <p className="text-sm font-semibold text-white truncate leading-tight">
+              <p className="text-sm font-bold text-white truncate leading-tight">
                 {user.full_name || 'Admin'}
               </p>
-              <p className="text-[11px] text-red-200 truncate">
-                {user.role || 'System Administrator'}
-              </p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span
+                  className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider ${
+                    String(user.role).toUpperCase() === 'ADMIN'
+                      ? 'bg-amber-400 text-amber-950 shadow-2xs'
+                      : String(user.role).toUpperCase() === 'VIEWER'
+                      ? 'bg-blue-300 text-blue-950 shadow-2xs'
+                      : 'bg-white/20 text-white'
+                  }`}
+                >
+                  {user.role || 'ADMIN'}
+                </span>
+                <span className="text-[10px] text-red-200 truncate">
+                  {String(user.role).toUpperCase() === 'ADMIN'
+                    ? 'Full Access'
+                    : String(user.role).toUpperCase() === 'VIEWER'
+                    ? 'View Only'
+                    : 'Standard'}
+                </span>
+              </div>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center sm:justify-start space-x-2 px-3.5 py-2 rounded-xl text-xs font-medium text-red-200 hover:bg-white/10 hover:text-white transition cursor-pointer"
+            className="w-full flex items-center justify-center sm:justify-start space-x-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-red-100 hover:bg-white/10 hover:text-white transition cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
             <span>Logout</span>

@@ -14,18 +14,29 @@ import {
   PackageMinus,
   Info,
   Calculator,
+  Eye,
+  Shield,
 } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
-import { getItems, createStockOutward, getStockOutward, getDepartments } from '@/lib/api';
+import { getItems, createStockOutward, getStockOutward, getDepartments, getCurrentUser, isUserViewer } from '@/lib/api';
 
 const UNITS = ['QTL', 'KG', 'PKT', 'LITRE', 'TIN'];
-const PACKAGE_TYPES = [
-  { label: 'Bags / Sacks', singular: 'Bag' },
-  { label: 'Tins / Cans', singular: 'Tin' },
-  { label: 'Packets / Pouches', singular: 'Packet' },
-  { label: 'Boxes / Cartons', singular: 'Box' },
-  { label: 'Drums / Barrels', singular: 'Drum' },
-  { label: 'Units / Pieces', singular: 'Unit' },
+
+interface PackageTypeConfig {
+  label: string;
+  singular: string;
+  defaultSize: string;
+  defaultUnit: string;
+  quickSizes: number[];
+}
+
+const PACKAGE_TYPES: PackageTypeConfig[] = [
+  { label: 'Bags / Sacks', singular: 'Bag', defaultSize: '30', defaultUnit: 'KG', quickSizes: [5, 10, 20, 25, 30, 50, 100] },
+  { label: 'Tins / Cans', singular: 'Tin', defaultSize: '15', defaultUnit: 'LITRE', quickSizes: [1, 2, 5, 10, 15, 20] },
+  { label: 'Packets / Pouches', singular: 'Packet', defaultSize: '1', defaultUnit: 'PKT', quickSizes: [0.5, 1, 2, 5, 10, 25] },
+  { label: 'Boxes / Cartons', singular: 'Box', defaultSize: '24', defaultUnit: 'PKT', quickSizes: [6, 12, 20, 24, 48, 100] },
+  { label: 'Drums / Barrels', singular: 'Drum', defaultSize: '200', defaultUnit: 'LITRE', quickSizes: [50, 100, 200, 250] },
+  { label: 'Units / Pieces', singular: 'Unit', defaultSize: '1', defaultUnit: 'KG', quickSizes: [1, 2, 5, 10, 50] },
 ];
 
 const QUICK_SIZES_BY_UNIT: Record<string, number[]> = {
@@ -38,6 +49,8 @@ const QUICK_SIZES_BY_UNIT: Record<string, number[]> = {
 
 export default function StockOutwardPage() {
   const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isViewer, setIsViewer] = useState(false);
   const [items, setItems] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [recentOutwards, setRecentOutwards] = useState<any[]>([]);
@@ -69,7 +82,23 @@ export default function StockOutwardPage() {
 
   useEffect(() => {
     fetchInitialData();
+    const u = getCurrentUser();
+    setCurrentUser(u);
+    if (u && String(u.role).toUpperCase() === 'VIEWER') {
+      setIsViewer(true);
+    }
   }, []);
+
+  const handleSelectPackageType = (ptLabel: string) => {
+    const pkg = PACKAGE_TYPES.find((p) => p.label === ptLabel);
+    if (!pkg) return;
+    setPackageType(pkg.label);
+    setPackSize(pkg.defaultSize);
+
+    if (!packCount || parseFloat(packCount) <= 0) {
+      setPackCount(pkg.label === 'Tins / Cans' ? '2' : pkg.label === 'Drums / Barrels' ? '1' : '5');
+    }
+  };
 
   // Update calculated outward quantity when packCount, packSize or packageType changes
   useEffect(() => {
@@ -84,7 +113,7 @@ export default function StockOutwardPage() {
         ...prev,
         Quantity: total > 0 ? String(total) : '',
         Remarks:
-          count > 0 && size > 0 && (!prev.Remarks || prev.Remarks.includes('@') || prev.Remarks.includes('Bags') || prev.Remarks.includes('Tins'))
+          count > 0 && size > 0 && (!prev.Remarks || prev.Remarks.includes('@') || prev.Remarks.includes('Bags') || prev.Remarks.includes('Tins') || prev.Remarks.includes('Boxes') || prev.Remarks.includes('Drums') || prev.Remarks.includes('Packets'))
             ? `${count} ${pkgLabel}s @ ${size} ${prev.Unit}/${pkgLabel.toLowerCase()} issued to ${prev.Department}`
             : prev.Remarks,
       }));
@@ -305,9 +334,9 @@ export default function StockOutwardPage() {
     }
   };
 
-  const quickSizes = QUICK_SIZES_BY_UNIT[formData.Unit] || [5, 10, 20, 25, 30, 50];
   const activePackage = PACKAGE_TYPES.find((p) => p.label === packageType);
   const containerSingular = activePackage ? activePackage.singular : 'Container';
+  const quickSizes = activePackage?.quickSizes || QUICK_SIZES_BY_UNIT[formData.Unit] || [5, 10, 20, 25, 30, 50];
 
   return (
     <AppLayout>
@@ -353,6 +382,26 @@ export default function StockOutwardPage() {
               <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
             )}
             <span>{message.text}</span>
+          </div>
+        )}
+
+        {/* Read-Only Viewer Notice */}
+        {isViewer && (
+          <div className="bg-blue-50/90 border-2 border-blue-200 p-4 rounded-2xl flex items-center justify-between text-xs text-blue-900 shadow-xs">
+            <div className="flex items-center space-x-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <Eye className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="font-bold text-blue-950 text-sm">Viewer Access (Read-Only Mode)</p>
+                <p className="text-blue-700 mt-0.5">
+                  You are signed in with the <strong>VIEWER</strong> role. You can inspect stock balances and outward issue history below, but recording stock outward issues is disabled.
+                </p>
+              </div>
+            </div>
+            <span className="px-3 py-1 bg-blue-200/80 text-blue-900 rounded-lg font-black uppercase tracking-wider text-[11px] shrink-0">
+              View Only
+            </span>
           </div>
         )}
 
@@ -536,7 +585,7 @@ export default function StockOutwardPage() {
                         <button
                           key={pt.label}
                           type="button"
-                          onClick={() => setPackageType(pt.label)}
+                          onClick={() => handleSelectPackageType(pt.label)}
                           className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
                             packageType === pt.label
                               ? 'bg-red-600 text-white shadow-xs'
@@ -558,10 +607,11 @@ export default function StockOutwardPage() {
                       <input
                         type="number"
                         step="any"
+                        disabled={isViewer}
                         value={packCount}
                         onChange={(e) => setPackCount(e.target.value)}
                         placeholder="e.g. 5 Bags or 2 Tins"
-                        className="w-full px-3 py-2.5 text-xs bg-white border-2 border-red-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-bold text-gray-900 text-base"
+                        className="w-full px-3 py-2.5 text-xs bg-white border-2 border-red-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-bold text-gray-900 text-base disabled:bg-gray-100 disabled:cursor-not-allowed"
                       />
                     </div>
 
@@ -573,18 +623,20 @@ export default function StockOutwardPage() {
                       <input
                         type="number"
                         step="any"
+                        disabled={isViewer}
                         value={packSize}
                         onChange={(e) => setPackSize(e.target.value)}
                         placeholder="e.g. 30 KG or 15 Litres"
-                        className="w-full px-3 py-2.5 text-xs bg-white border-2 border-red-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-bold text-gray-900 text-base"
+                        className="w-full px-3 py-2.5 text-xs bg-white border-2 border-red-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-bold text-gray-900 text-base disabled:bg-gray-100 disabled:cursor-not-allowed"
                       />
                       <div className="flex flex-wrap gap-1.5 mt-2">
                         {quickSizes.map((s) => (
                           <button
                             key={s}
                             type="button"
+                            disabled={isViewer}
                             onClick={() => setPackSize(String(s))}
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold border transition cursor-pointer ${
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold border transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                               packSize === String(s)
                                 ? 'bg-red-600 text-white border-red-600'
                                 : 'bg-white text-gray-700 border-gray-200 hover:border-red-300'
@@ -618,10 +670,11 @@ export default function StockOutwardPage() {
                   <input
                     type="number"
                     step="any"
+                    disabled={isViewer}
                     value={formData.Quantity}
                     onChange={(e) => setFormData({ ...formData, Quantity: e.target.value })}
                     placeholder="e.g. 150"
-                    className="w-full max-w-sm px-3 py-2.5 text-xs bg-white border-2 border-red-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-bold text-gray-900"
+                    className="w-full max-w-sm px-3 py-2.5 text-xs bg-white border-2 border-red-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-bold text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed"
                     required
                   />
                 </div>
@@ -642,9 +695,10 @@ export default function StockOutwardPage() {
                   </label>
                   <input
                     type="date"
+                    disabled={isViewer}
                     value={formData.Outward_Date}
                     onChange={(e) => setFormData({ ...formData, Outward_Date: e.target.value })}
-                    className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium text-gray-800"
+                    className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium text-gray-800 disabled:bg-gray-100 disabled:cursor-not-allowed"
                     required
                   />
                 </div>
@@ -655,9 +709,10 @@ export default function StockOutwardPage() {
                     Department <span className="text-red-500">*</span>
                   </label>
                   <select
+                    disabled={isViewer}
                     value={formData.Department}
                     onChange={(e) => setFormData({ ...formData, Department: e.target.value })}
-                    className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-bold text-gray-800"
+                    className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-bold text-gray-800 disabled:bg-gray-100 disabled:cursor-not-allowed"
                     required
                   >
                     <option value="Langar">Langar</option>
@@ -672,10 +727,11 @@ export default function StockOutwardPage() {
                   </label>
                   <input
                     type="text"
+                    disabled={isViewer}
                     value={formData.Issued_To}
                     onChange={(e) => setFormData({ ...formData, Issued_To: e.target.value })}
                     placeholder="e.g. Kitchen Sevadar / Incharge"
-                    className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium"
+                    className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -688,10 +744,11 @@ export default function StockOutwardPage() {
                   </label>
                   <input
                     type="text"
+                    disabled={isViewer}
                     value={formData.Receiver_Name}
                     onChange={(e) => setFormData({ ...formData, Receiver_Name: e.target.value })}
                     placeholder="e.g. Harpreet Singh"
-                    className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium"
+                    className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -702,10 +759,11 @@ export default function StockOutwardPage() {
                   </label>
                   <input
                     type="text"
+                    disabled={isViewer}
                     value={formData.Purpose}
                     onChange={(e) => setFormData({ ...formData, Purpose: e.target.value })}
                     placeholder="e.g. Morning Prasad Cooking"
-                    className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium"
+                    className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -716,10 +774,11 @@ export default function StockOutwardPage() {
                   </label>
                   <input
                     type="text"
+                    disabled={isViewer}
                     value={formData.Remarks}
                     onChange={(e) => setFormData({ ...formData, Remarks: e.target.value })}
                     placeholder="e.g. 2 Tins @ 15 LITRE/tin or 5 Bags @ 30 KG/bag"
-                    className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium"
+                    className="w-full px-3 py-2.5 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -730,20 +789,27 @@ export default function StockOutwardPage() {
               <button
                 type="button"
                 onClick={handleReset}
-                className="inline-flex items-center space-x-1.5 px-4 py-2.5 border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl text-xs font-semibold transition cursor-pointer shadow-2xs"
+                disabled={isViewer}
+                className="inline-flex items-center space-x-1.5 px-4 py-2.5 border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl text-xs font-semibold transition cursor-pointer shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <RotateCcw className="w-3.5 h-3.5 text-gray-500" />
                 <span>Reset</span>
               </button>
 
-              <button
-                type="submit"
-                disabled={saving}
-                className="inline-flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-xs disabled:opacity-50"
-              >
-                <Save className="w-4 h-4" />
-                <span>{saving ? 'Recording Outward...' : 'Save Outward Stock'}</span>
-              </button>
+              {isViewer ? (
+                <div className="px-5 py-2.5 bg-gray-100 text-gray-400 border border-gray-200 rounded-xl text-xs font-bold flex items-center gap-2 cursor-not-allowed">
+                  <span>🔒 Read-Only (Issue Disabled for Viewer)</span>
+                </div>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="inline-flex items-center space-x-2 px-6 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-xs disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{saving ? 'Recording Outward...' : 'Save Outward Stock'}</span>
+                </button>
+              )}
             </div>
           </div>
         </form>

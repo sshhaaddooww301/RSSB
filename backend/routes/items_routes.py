@@ -20,7 +20,7 @@ async def list_items(user: dict = Depends(get_current_user)):
 
 
 @router.get("/all")
-async def list_all_items(user: dict = Depends(require_roles("ADMIN", "MANAGER"))):
+async def list_all_items(user: dict = Depends(get_current_user)):
     items = await excel_service.get_all_items_including_inactive()
     return ApiResponse(data=items)
 

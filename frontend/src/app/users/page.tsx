@@ -10,13 +10,19 @@ import {
   X,
   AlertCircle,
   UserCheck,
+  Eye,
+  Lock,
 } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
-import { getUsers, createUser, updateUser } from '@/lib/api';
+import { getUsers, createUser, updateUser, getCurrentUser, isUserAdmin, isUserViewer } from '@/lib/api';
 
 const ROLES = ['ADMIN', 'MANAGER', 'STAFF', 'VIEWER'];
 
 export default function UsersPage() {
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const isAdmin = isUserAdmin(currentUser);
+  const isViewer = isUserViewer(currentUser);
+
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -45,9 +51,12 @@ export default function UsersPage() {
 
   useEffect(() => {
     fetchUsers();
+    const u = getCurrentUser();
+    if (u) setCurrentUser(u);
   }, []);
 
   const openAddModal = () => {
+    if (!isAdmin) return;
     setEditingUser(null);
     setModalForm({
       Username: '',
@@ -62,6 +71,7 @@ export default function UsersPage() {
   };
 
   const openEditModal = (u: any) => {
+    if (!isAdmin) return;
     setEditingUser(u);
     setModalForm({
       Username: u.Username,
@@ -77,6 +87,10 @@ export default function UsersPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdmin) {
+      setError('Admin privileges required to create or modify accounts.');
+      return;
+    }
     if (!modalForm.Username || !modalForm.Full_Name) {
       setError('Username and Full Name are required.');
       return;
@@ -116,6 +130,21 @@ export default function UsersPage() {
   return (
     <AppLayout>
       <div className="space-y-6 max-w-6xl mx-auto pb-12">
+        {/* Read-only notice for non-admin roles */}
+        {!isAdmin && (
+          <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-2xl flex items-center justify-between text-xs text-amber-900 shadow-2xs">
+            <div className="flex items-center space-x-2.5">
+              <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                <strong>Admin Privileges Required:</strong> User account creation and permissions modification are restricted to Administrator accounts.
+              </span>
+            </div>
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900 uppercase">
+              View Directory Only
+            </span>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center space-x-3.5">
@@ -130,13 +159,15 @@ export default function UsersPage() {
             </div>
           </div>
 
-          <button
-            onClick={openAddModal}
-            className="inline-flex items-center space-x-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold shadow-xs transition"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add User</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={openAddModal}
+              className="inline-flex items-center space-x-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold shadow-xs transition cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add User</span>
+            </button>
+          )}
         </div>
 
         {/* Roles Breakdown Card */}
@@ -205,12 +236,17 @@ export default function UsersPage() {
                     </td>
                     <td className="px-4 py-3 text-gray-400">{u.Last_Login || 'Never'}</td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => openEditModal(u)}
-                        className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
+                      {isAdmin ? (
+                        <button
+                          onClick={() => openEditModal(u)}
+                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                          title="Edit User Details"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-gray-400 font-semibold italic">Admin Only</span>
+                      )}
                     </td>
                   </tr>
                 ))}

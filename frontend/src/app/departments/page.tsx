@@ -1,11 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Building2, Edit2, CheckCircle2, ShieldCheck, X } from 'lucide-react';
+import { Building2, Edit2, CheckCircle2, ShieldCheck, X, Eye } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
-import { getDepartments, updateDepartment } from '@/lib/api';
+import { getDepartments, updateDepartment, getCurrentUser, isUserViewer } from '@/lib/api';
 
 export default function DepartmentsPage() {
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const isViewer = isUserViewer(currentUser);
+
   const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingDept, setEditingDept] = useState<any | null>(null);
@@ -26,9 +29,12 @@ export default function DepartmentsPage() {
 
   useEffect(() => {
     fetchDepts();
+    const u = getCurrentUser();
+    if (u) setCurrentUser(u);
   }, []);
 
   const handleEdit = (dept: any) => {
+    if (isViewer) return;
     setEditingDept(dept);
     setDesc(dept.Description || '');
     setCode(dept.Short_Code || '');
@@ -36,7 +42,7 @@ export default function DepartmentsPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingDept) return;
+    if (!editingDept || isViewer) return;
     try {
       await updateDepartment(editingDept.Department_ID, {
         Description: desc,
@@ -52,6 +58,21 @@ export default function DepartmentsPage() {
   return (
     <AppLayout>
       <div className="space-y-6 max-w-5xl mx-auto pb-12">
+        {/* Read-only notice for Viewer role */}
+        {isViewer && (
+          <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-2xl flex items-center justify-between text-xs text-amber-900 shadow-2xs">
+            <div className="flex items-center space-x-2.5">
+              <Eye className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                <strong>Viewer Access Mode:</strong> You have Read-Only permissions. Department configuration editing is restricted.
+              </span>
+            </div>
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900 uppercase">
+              View Only
+            </span>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center space-x-3.5">
           <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center text-red-600">
@@ -97,13 +118,17 @@ export default function DepartmentsPage() {
 
               <div className="pt-4 mt-4 border-t border-gray-100 flex items-center justify-between text-xs text-gray-400">
                 <span>Dept ID: {dept.Department_ID}</span>
-                <button
-                  onClick={() => handleEdit(dept)}
-                  className="inline-flex items-center space-x-1 px-3 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg font-semibold transition"
-                >
-                  <Edit2 className="w-3 h-3" />
-                  <span>Edit Details</span>
-                </button>
+                {!isViewer ? (
+                  <button
+                    onClick={() => handleEdit(dept)}
+                    className="inline-flex items-center space-x-1 px-3 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg font-semibold transition cursor-pointer"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                    <span>Edit Details</span>
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-gray-400 italic">View Only</span>
+                )}
               </div>
             </div>
           ))}

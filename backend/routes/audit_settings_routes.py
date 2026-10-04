@@ -4,7 +4,7 @@ Audit logs and Settings routes.
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from auth import require_roles
+from auth import get_current_user, require_roles
 from models import ApiResponse, SettingUpdate
 from services import excel_service
 from services.graph_client import GraphClientError
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api", tags=["Audit & Settings"])
 # ── Audit Logs ─────────────────────────────────────────────────────────
 
 @router.get("/audit-logs")
-async def list_audit_logs(user: dict = Depends(require_roles("ADMIN"))):
+async def list_audit_logs(user: dict = Depends(get_current_user)):
     logs = await excel_service.get_audit_logs()
     # Sort newest first
     logs.sort(key=lambda x: str(x.get("Date_Time", "")), reverse=True)
@@ -25,7 +25,7 @@ async def list_audit_logs(user: dict = Depends(require_roles("ADMIN"))):
 # ── Settings ───────────────────────────────────────────────────────────
 
 @router.get("/settings")
-async def list_settings(user: dict = Depends(require_roles("ADMIN"))):
+async def list_settings(user: dict = Depends(get_current_user)):
     s = await excel_service.get_all_settings()
     return ApiResponse(data=s)
 

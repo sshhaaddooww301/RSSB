@@ -4,7 +4,7 @@ Users management routes.
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from auth import require_roles, hash_password
+from auth import get_current_user, require_roles, hash_password
 from models import UserCreate, UserUpdate, ApiResponse
 from services import excel_service
 from services.graph_client import GraphClientError
@@ -13,8 +13,10 @@ router = APIRouter(prefix="/api/users", tags=["Users"])
 
 
 @router.get("")
-async def list_users(user: dict = Depends(require_roles("ADMIN"))):
+async def list_users(user: dict = Depends(get_current_user)):
     users = await excel_service.get_all_users()
+    for u in users:
+        u.pop("Password_Hash", None)
     return ApiResponse(data=users)
 
 
