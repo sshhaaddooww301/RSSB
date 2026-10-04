@@ -18,7 +18,7 @@ import {
 import AppLayout from '@/components/AppLayout';
 import { getItems, createStockOutward, getStockOutward, getDepartments } from '@/lib/api';
 
-const UNITS = ['KG', 'QTL', 'LITRE', 'PACKET', 'PIECE'];
+const UNITS = ['QTL', 'KG', 'PKT', 'TIN'];
 const PACKAGE_TYPES = [
   { label: 'Bags / Sacks', singular: 'Bag' },
   { label: 'Tins / Cans', singular: 'Tin' },
@@ -29,11 +29,10 @@ const PACKAGE_TYPES = [
 ];
 
 const QUICK_SIZES_BY_UNIT: Record<string, number[]> = {
+  QTL: [1, 2, 5, 10, 20, 50, 100],
   KG: [5, 10, 20, 25, 30, 50, 100],
-  LITRE: [1, 2, 5, 10, 15, 20, 200],
-  QTL: [1, 5, 10],
-  PACKET: [6, 12, 24, 50, 100],
-  PIECE: [6, 12, 24, 50, 100],
+  PKT: [6, 12, 24, 50, 100, 200],
+  TIN: [1, 2, 5, 10, 15, 20, 50],
 };
 
 export default function StockOutwardPage() {
@@ -55,7 +54,7 @@ export default function StockOutwardPage() {
     Item_No: '',
     Item_Name: '',
     SKU: '',
-    Unit: 'KG',
+    Unit: 'QTL',
     Current_Stock: '',
     Langar_Qty: '',
     Outward_Date: new Date().toISOString().split('T')[0],
@@ -223,7 +222,7 @@ export default function StockOutwardPage() {
       Item_No: '',
       Item_Name: '',
       SKU: '',
-      Unit: 'KG',
+      Unit: 'QTL',
       Current_Stock: '',
       Langar_Qty: '',
       Outward_Date: new Date().toISOString().split('T')[0],

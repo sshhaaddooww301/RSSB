@@ -15,7 +15,7 @@ import {
 import AppLayout from '@/components/AppLayout';
 import { getItems, createItem, updateItem } from '@/lib/api';
 
-const UNITS = ['KG', 'QTL', 'LITRE', 'PACKET', 'PIECE'];
+const UNITS = ['QTL', 'KG', 'PKT', 'TIN'];
 
 export default function InventoryPage() {
   const [items, setItems] = useState<any[]>([]);
@@ -31,7 +31,7 @@ export default function InventoryPage() {
     Item_No: '',
     Item_Name: '',
     SKU: '', // Stores Langar Requirement
-    Unit: 'KG',
+    Unit: 'QTL',
     Langar_Qty: '0',
     Minimum_Stock: '20',
     Critical_Stock: '5',
@@ -64,7 +64,7 @@ export default function InventoryPage() {
       Item_No: '',
       Item_Name: '',
       SKU: '',
-      Unit: 'KG',
+      Unit: 'QTL',
       Langar_Qty: '0',
       Minimum_Stock: '20',
       Critical_Stock: '5',
@@ -346,7 +346,7 @@ export default function InventoryPage() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block font-semibold text-gray-700 mb-1">Langar Requirement</label>
+                    <label className="block font-semibold text-gray-700 mb-1">SKU / Langar Requirement</label>
                     <input
                       type="text"
                       value={modalForm.SKU}
