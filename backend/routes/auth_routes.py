@@ -20,46 +20,60 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 @router.post("/login", response_model=TokenResponse)
 async def login(credentials: UserLogin, request: Request, response: Response):
-    user = await authenticate_user(credentials.Username, credentials.Password)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+    try:
+        user = await authenticate_user(credentials.Username, credentials.Password)
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid username or password")
 
-    token = create_access_token({"sub": user["Username"], "role": user.get("Role", "STAFF")})
+        token = create_access_token({"sub": user["Username"], "role": user.get("Role", "STAFF")})
 
-    # Update last login
-    await excel_service.update_user(user["Username"], {
-        "Last_Login": excel_service._now_str(),
-        "Password_Hash": user.get("Password_Hash", ""),
-    })
+        # Update last login (non-critical)
+        try:
+            await excel_service.update_user(user["Username"], {
+                "Last_Login": excel_service._now_str(),
+                "Password_Hash": user.get("Password_Hash", ""),
+            })
+        except Exception as e:
+            pass
 
-    # Audit log
-    await excel_service.create_audit_log({
-        "User": user["Username"],
-        "Action": "Login",
-        "Module": "Auth",
-        "Details": f"User {user['Username']} logged in",
-        "IP_Address": request.client.host if request.client else "",
-    })
+        # Audit log (non-critical)
+        try:
+            await excel_service.create_audit_log({
+                "User": user["Username"],
+                "Action": "Login",
+                "Module": "Auth",
+                "Details": f"User {user['Username']} logged in",
+                "IP_Address": request.client.host if request.client else "",
+            })
+        except Exception as e:
+            pass
 
-    # Set HTTP-only cookie
-    response.set_cookie(
-        key="access_token",
-        value=token,
-        httponly=True,
-        secure=settings.is_production,
-        samesite="lax",
-        max_age=3600 * 8,
-    )
+        # Set HTTP-only cookie
+        try:
+            response.set_cookie(
+                key="access_token",
+                value=token,
+                httponly=True,
+                secure=settings.is_production,
+                samesite="none" if settings.is_production else "lax",
+                max_age=3600 * 8,
+            )
+        except Exception:
+            pass
 
-    return TokenResponse(
-        access_token=token,
-        user={
-            "username": user["Username"],
-            "full_name": user.get("Full_Name", ""),
-            "role": user.get("Role", "STAFF"),
-            "email": user.get("Email", ""),
-        },
-    )
+        return TokenResponse(
+            access_token=token,
+            user={
+                "username": user["Username"],
+                "full_name": user.get("Full_Name", ""),
+                "role": user.get("Role", "STAFF"),
+                "email": user.get("Email", ""),
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Login error: {str(exc)}")
 
 
 @router.post("/logout")
