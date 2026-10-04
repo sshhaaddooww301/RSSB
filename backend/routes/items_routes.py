@@ -34,7 +34,7 @@ async def get_item(item_no: str, user: dict = Depends(get_current_user)):
 
 
 @router.post("")
-async def create_item(body: ItemCreate, request: Request, user: dict = Depends(require_roles("ADMIN", "MANAGER"))):
+async def create_item(body: ItemCreate, request: Request, user: dict = Depends(require_roles("ADMIN", "MANAGER", "STAFF"))):
     unit_val = str(getattr(body.Unit, "value", body.Unit)).strip().upper()
     if unit_val not in settings.VALID_UNITS:
         raise HTTPException(status_code=400, detail=f"Invalid unit. Must be one of: {', '.join(settings.VALID_UNITS)}")
@@ -62,7 +62,7 @@ async def create_item(body: ItemCreate, request: Request, user: dict = Depends(r
 
 
 @router.put("/{item_no}")
-async def update_item(item_no: str, body: ItemUpdate, request: Request, user: dict = Depends(require_roles("ADMIN", "MANAGER"))):
+async def update_item(item_no: str, body: ItemUpdate, request: Request, user: dict = Depends(require_roles("ADMIN", "MANAGER", "STAFF"))):
     try:
         update_data = body.model_dump(exclude_none=True)
         if "Unit" in update_data:
