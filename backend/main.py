@@ -8,6 +8,12 @@ Features:
 - High-Performance Caching & Excel Integration
 """
 
+import sys
+import os
+
+# Ensure backend directory is in python module search path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import time
 import logging
 from collections import defaultdict
