@@ -10,9 +10,28 @@ import {
   Bell,
   Sliders,
   Lock,
+  Download,
+  HardDrive,
+  RefreshCw,
+  FileSpreadsheet,
+  FileCode,
+  History,
+  Sparkles,
+  Clock,
 } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
-import { getSettings, updateSetting, getCurrentUser, isUserAdmin, isUserViewer } from '@/lib/api';
+import {
+  getSettings,
+  updateSetting,
+  getCurrentUser,
+  isUserAdmin,
+  isUserViewer,
+  downloadExcelBackup,
+  downloadJsonBackup,
+  triggerManualBackup,
+  getBackupList,
+  downloadHistoricBackupFile,
+} from '@/lib/api';
 
 export default function SettingsPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -23,6 +42,13 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  // Backup State
+  const [backups, setBackups] = useState<any[]>([]);
+  const [loadingBackups, setLoadingBackups] = useState(false);
+  const [backupDownloading, setBackupDownloading] = useState<'excel' | 'json' | string | null>(null);
+  const [backupTriggering, setBackupTriggering] = useState(false);
+  const [backupMessage, setBackupMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Form values
   const [form, setForm] = useState<Record<string, string>>({
@@ -53,11 +79,77 @@ export default function SettingsPage() {
     }
   };
 
+  const fetchBackups = async () => {
+    try {
+      setLoadingBackups(true);
+      const res = await getBackupList();
+      if (res && res.data) {
+        setBackups(res.data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingBackups(false);
+    }
+  };
+
   useEffect(() => {
     fetchSettings();
+    fetchBackups();
     const u = getCurrentUser();
     if (u) setCurrentUser(u);
   }, []);
+
+  const handleDownloadExcel = async () => {
+    try {
+      setBackupDownloading('excel');
+      setBackupMessage(null);
+      await downloadExcelBackup();
+      setBackupMessage({ type: 'success', text: 'Full Excel database backup downloaded successfully!' });
+    } catch (err: any) {
+      setBackupMessage({ type: 'error', text: err.message || 'Failed to download Excel backup.' });
+    } finally {
+      setBackupDownloading(null);
+    }
+  };
+
+  const handleDownloadJson = async () => {
+    try {
+      setBackupDownloading('json');
+      setBackupMessage(null);
+      await downloadJsonBackup();
+      setBackupMessage({ type: 'success', text: 'Full JSON database backup downloaded successfully!' });
+    } catch (err: any) {
+      setBackupMessage({ type: 'error', text: err.message || 'Failed to download JSON backup.' });
+    } finally {
+      setBackupDownloading(null);
+    }
+  };
+
+  const handleTriggerBackup = async () => {
+    try {
+      setBackupTriggering(true);
+      setBackupMessage(null);
+      const res = await triggerManualBackup();
+      setBackupMessage({ type: 'success', text: res.message || 'New backup snapshot saved to server!' });
+      fetchBackups();
+    } catch (err: any) {
+      setBackupMessage({ type: 'error', text: err.message || 'Failed to trigger backup snapshot.' });
+    } finally {
+      setBackupTriggering(false);
+    }
+  };
+
+  const handleDownloadHistoric = async (fname: string) => {
+    try {
+      setBackupDownloading(fname);
+      await downloadHistoricBackupFile(fname);
+    } catch (err: any) {
+      alert(err.message || 'Failed to download backup file');
+    } finally {
+      setBackupDownloading(null);
+    }
+  };
 
   const handleSaveAll = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -211,6 +303,159 @@ export default function SettingsPage() {
                   <code>STOCK_OUTWARD</code>, <code>DEPARTMENTS</code>, <code>USERS</code>,{' '}
                   <code>AUDIT_LOGS</code>, <code>SETTINGS</code>.
                 </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: Automated Daily Backup & Database Export */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
+            <div className="bg-gradient-to-r from-red-600 to-red-700 px-5 py-3.5 text-white flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <HardDrive className="w-4 h-4 text-white" />
+                <div>
+                  <h2 className="text-sm font-bold">Automated Daily Database Backups</h2>
+                  <p className="text-[10px] text-red-100">Everyday automatic snapshots + multi-sheet Excel & JSON downloads</p>
+                </div>
+              </div>
+              <span className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500 text-white shadow-2xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                <span>Auto-Backup Active</span>
+              </span>
+            </div>
+
+            <div className="p-5 space-y-5 text-xs">
+              {/* Status and Action Buttons */}
+              <div className="p-4 bg-red-50/50 rounded-2xl border border-red-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <Clock className="w-4 h-4 text-red-600" />
+                    <span className="font-bold text-gray-900">Scheduled Daily Archive</span>
+                  </div>
+                  <p className="text-gray-600 text-[11px]">
+                    System automatically creates a full database backup every day with a 45-day rolling retention.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleDownloadExcel}
+                    disabled={backupDownloading === 'excel'}
+                    className="inline-flex items-center space-x-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer disabled:opacity-50"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5" />
+                    <span>{backupDownloading === 'excel' ? 'Generating...' : 'Download Full Excel (.xlsx)'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadJson}
+                    disabled={backupDownloading === 'json'}
+                    className="inline-flex items-center space-x-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer disabled:opacity-50"
+                  >
+                    <FileCode className="w-3.5 h-3.5" />
+                    <span>{backupDownloading === 'json' ? 'Generating...' : 'Download JSON Dump'}</span>
+                  </button>
+
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={handleTriggerBackup}
+                      disabled={backupTriggering}
+                      className="inline-flex items-center space-x-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${backupTriggering ? 'animate-spin' : ''}`} />
+                      <span>{backupTriggering ? 'Saving Snapshot...' : 'Take Snapshot Now'}</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {backupMessage && (
+                <div
+                  className={`p-3.5 rounded-xl text-xs font-semibold flex items-center space-x-2 ${
+                    backupMessage.type === 'success'
+                      ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                      : 'bg-red-50 border border-red-200 text-red-800'
+                  }`}
+                >
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{backupMessage.text}</span>
+                </div>
+              )}
+
+              {/* Stored Daily Backups List */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-gray-900 flex items-center space-x-1.5">
+                    <History className="w-4 h-4 text-gray-500" />
+                    <span>Server Backup Archive ({backups.length} stored snapshots)</span>
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={fetchBackups}
+                    className="text-[11px] font-semibold text-red-600 hover:underline flex items-center space-x-1 cursor-pointer"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Refresh List</span>
+                  </button>
+                </div>
+
+                <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+                  <div className="overflow-x-auto max-h-56 overflow-y-auto">
+                    <table className="w-full text-left text-xs text-gray-600">
+                      <thead className="bg-gray-50/80 text-gray-500 uppercase text-[10px] font-bold border-b border-gray-100 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-2.5">Snapshot Filename</th>
+                          <th className="px-4 py-2.5">Type</th>
+                          <th className="px-4 py-2.5">Created Date</th>
+                          <th className="px-4 py-2.5">Size</th>
+                          <th className="px-4 py-2.5 text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 font-medium">
+                        {backups.map((b, idx) => (
+                          <tr key={idx} className="hover:bg-red-50/20 transition">
+                            <td className="px-4 py-2.5 font-mono font-semibold text-gray-900 text-[11px]">
+                              {b.filename}
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <span
+                                className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  b.file_type.includes('Excel')
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-slate-100 text-slate-800'
+                                }`}
+                              >
+                                {b.file_type}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2.5 text-gray-500">{b.created_at}</td>
+                            <td className="px-4 py-2.5 font-semibold text-gray-700">{b.size_display}</td>
+                            <td className="px-4 py-2.5 text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadHistoric(b.filename)}
+                                disabled={backupDownloading === b.filename}
+                                className="inline-flex items-center space-x-1 px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-[11px] font-bold transition border border-red-200 cursor-pointer disabled:opacity-50"
+                              >
+                                <Download className="w-3 h-3" />
+                                <span>{backupDownloading === b.filename ? '...' : 'Download'}</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                        {backups.length === 0 && (
+                          <tr>
+                            <td colSpan={5} className="px-4 py-6 text-center text-gray-400">
+                              {loadingBackups ? 'Loading backups...' : 'No daily backup archives stored yet.'}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

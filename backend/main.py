@@ -35,6 +35,8 @@ from routes.dashboard_routes import router as dashboard_router
 from routes.users_routes import router as users_router
 from routes.audit_settings_routes import router as audit_settings_router
 from routes.bartan_inward_routes import router as bartan_inward_router
+from routes.backup_routes import router as backup_router
+from services.backup_service import daily_backup_background_task
 
 # Logging
 logging.basicConfig(
@@ -75,7 +77,11 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error("❌ Local Excel init failed: %s", e)
 
+    # Start automated daily backup background task
+    backup_bg_task = asyncio.create_task(daily_backup_background_task())
+
     yield
+    backup_bg_task.cancel()
     logger.info("Shutting down ...")
 
 
@@ -168,6 +174,7 @@ app.include_router(dashboard_router)
 app.include_router(users_router)
 app.include_router(audit_settings_router)
 app.include_router(bartan_inward_router)
+app.include_router(backup_router)
 
 
 # ── Error handlers with Data Leak Protection ───────────────────────────
