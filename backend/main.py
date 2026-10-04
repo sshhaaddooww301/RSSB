@@ -187,6 +187,7 @@ async def general_error_handler(request: Request, exc: Exception):
 # ── Health check ───────────────────────────────────────────────────────
 
 @app.get("/api/health")
+@app.get("/healthz")
 async def health():
     return {
         "status": "ok",
