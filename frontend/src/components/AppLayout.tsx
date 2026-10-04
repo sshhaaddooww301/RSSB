@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Package,
@@ -23,7 +23,18 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [lowStockCount, setLowStockCount] = useState<number>(7);
   const [searchTerm, setSearchTerm] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+
+  // ── Auth Guard ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isLoggedIn()) {
+      router.replace('/login');
+    } else {
+      setAuthChecked(true);
+    }
+  }, [router]);
 
   useEffect(() => {
     const fetchAlerts = async () => {
@@ -49,6 +60,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
     { name: 'Bartan', href: '/bartan-inward', icon: Warehouse },
     { name: 'Records', href: '/records', icon: ReceiptText },
   ];
+
+  if (!authChecked) return null;
 
   return (
     <div className="flex min-h-screen bg-[#f8fafc]">
