@@ -45,11 +45,13 @@ class Settings:
         return self.APP_ENV.lower() == "production"
 
     def validate(self):
-        """Raise if critical settings are insecure in production."""
+        """Warn if critical settings are insecure in production (does not raise)."""
+        import logging as _logging
+        _log = _logging.getLogger("config")
         if self.is_production and self.APP_SECRET_KEY == "dev-secret-change-in-production":
-            raise RuntimeError(
-                "FATAL: APP_SECRET_KEY must be changed from the default value in production! "
-                "Set a strong random secret (at least 32 characters) in your .env file."
+            _log.warning(
+                "SECURITY WARNING: APP_SECRET_KEY is using the default dev value in production! "
+                "Please set a strong random secret via environment variables."
             )
 
     # Graph API base

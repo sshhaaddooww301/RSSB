@@ -89,11 +89,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
+# CORS — wildcard origin cannot be combined with allow_credentials=True (CORS spec violation)
+_cors_origins = settings.CORS_ORIGINS
+_allow_credentials = "*" not in _cors_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=_allow_credentials,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
