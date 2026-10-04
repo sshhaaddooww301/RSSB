@@ -107,6 +107,7 @@ export default function StockOutwardPage() {
   const [packageType, setPackageType] = useState('Bags / Sacks');
   const [packCount, setPackCount] = useState('');
   const [packSize, setPackSize] = useState('30');
+  const [recentSearch, setRecentSearch] = useState('');
 
   const [formData, setFormData] = useState({
     Item_No: '',
@@ -582,6 +583,29 @@ export default function StockOutwardPage() {
   const activePackage = PACKAGE_TYPES.find((p) => p.label === packageType);
   const containerSingular = activePackage ? activePackage.singular : 'Container';
   const quickSizes = activePackage?.quickSizes || QUICK_SIZES_BY_UNIT[formData.Unit] || [5, 10, 20, 25, 30, 50];
+
+  const sortedOutwards = [...recentOutwards].sort((a, b) => {
+    const dateA = a.Outward_Date || '';
+    const dateB = b.Outward_Date || '';
+    if (dateB !== dateA) return dateB.localeCompare(dateA);
+    const idA = a.Transaction_ID || '';
+    const idB = b.Transaction_ID || '';
+    return idB.localeCompare(idA);
+  });
+
+  const filteredOutwards = sortedOutwards.filter((r) => {
+    if (!recentSearch) return true;
+    const q = recentSearch.toLowerCase();
+    return (
+      (r.Transaction_ID || '').toLowerCase().includes(q) ||
+      (r.Item_No || '').toLowerCase().includes(q) ||
+      (r.Item_Name || '').toLowerCase().includes(q) ||
+      (r.Department || '').toLowerCase().includes(q) ||
+      (r.Issued_To || '').toLowerCase().includes(q) ||
+      (r.Receiver_Name || '').toLowerCase().includes(q) ||
+      (r.Remarks || '').toLowerCase().includes(q)
+    );
+  });
 
   return (
     <AppLayout>
@@ -1066,7 +1090,17 @@ export default function StockOutwardPage() {
               <h3 className="text-sm font-bold text-gray-900">Recent Stock Outward Issues</h3>
               <p className="text-[11px] text-gray-500">Click &quot;Edit&quot; under Actions to modify any outward record</p>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 flex-wrap gap-2">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={recentSearch}
+                  onChange={(e) => setRecentSearch(e.target.value)}
+                  placeholder="Search outwards..."
+                  className="pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-hidden font-medium"
+                />
+              </div>
               <button
                 type="button"
                 onClick={handleExportOutwardCSV}
@@ -1095,7 +1129,7 @@ export default function StockOutwardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-medium">
-                {recentOutwards.slice(0, 15).map((row, idx) => (
+                {filteredOutwards.slice(0, 30).map((row, idx) => (
                   <tr key={idx} className="hover:bg-red-50/20 transition">
                     <td className="px-4 py-3 font-semibold text-gray-900">{row.Transaction_ID}</td>
                     <td className="px-4 py-3">{row.Outward_Date}</td>
@@ -1147,10 +1181,10 @@ export default function StockOutwardPage() {
                     </td>
                   </tr>
                 ))}
-                {recentOutwards.length === 0 && (
+                {filteredOutwards.length === 0 && (
                   <tr>
                     <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
-                      No outward issues recorded yet.
+                      {recentSearch ? 'No matching outward records found.' : 'No outward issues recorded yet.'}
                     </td>
                   </tr>
                 )}

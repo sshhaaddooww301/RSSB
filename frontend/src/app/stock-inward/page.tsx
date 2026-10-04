@@ -84,6 +84,7 @@ export default function StockInwardPage() {
   const [packageType, setPackageType] = useState('Bags / Sacks');
   const [packCount, setPackCount] = useState('100');
   const [packSize, setPackSize] = useState('30');
+  const [recentSearch, setRecentSearch] = useState('');
 
   const [formData, setFormData] = useState({
     Item_No: '',
@@ -572,6 +573,28 @@ export default function StockInwardPage() {
   const activePackage = PACKAGE_TYPES.find((p) => p.label === packageType);
   const containerSingular = activePackage ? activePackage.singular : 'Container';
   const quickSizes = activePackage?.quickSizes || QUICK_SIZES_BY_UNIT[formData.Unit] || [5, 10, 20, 25, 30, 50];
+
+  const sortedInwards = [...recentInwards].sort((a, b) => {
+    const dateA = a.Inward_Date || '';
+    const dateB = b.Inward_Date || '';
+    if (dateB !== dateA) return dateB.localeCompare(dateA);
+    const idA = a.Transaction_ID || '';
+    const idB = b.Transaction_ID || '';
+    return idB.localeCompare(idA);
+  });
+
+  const filteredInwards = sortedInwards.filter((r) => {
+    if (!recentSearch) return true;
+    const q = recentSearch.toLowerCase();
+    return (
+      (r.Transaction_ID || '').toLowerCase().includes(q) ||
+      (r.Item_No || '').toLowerCase().includes(q) ||
+      (r.Item_Name || '').toLowerCase().includes(q) ||
+      (r.Supplier || '').toLowerCase().includes(q) ||
+      (r.Invoice_No || '').toLowerCase().includes(q) ||
+      (r.Remarks || '').toLowerCase().includes(q)
+    );
+  });
 
   return (
     <AppLayout>
@@ -1365,7 +1388,17 @@ export default function StockInwardPage() {
               <h3 className="text-sm font-bold text-gray-900">Recent Stock Inward Records</h3>
               <p className="text-[11px] text-gray-500">Live synced from Excel database</p>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 flex-wrap gap-2">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={recentSearch}
+                  onChange={(e) => setRecentSearch(e.target.value)}
+                  placeholder="Search inwards..."
+                  className="pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-hidden font-medium"
+                />
+              </div>
               <button
                 type="button"
                 onClick={handleExportInwardCSV}
@@ -1393,7 +1426,7 @@ export default function StockInwardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-medium">
-                {recentInwards.slice(0, 8).map((row, idx) => (
+                {filteredInwards.slice(0, 30).map((row, idx) => (
                   <tr key={idx} className="hover:bg-red-50/20 transition">
                     <td className="px-4 py-3 font-semibold text-gray-900">{row.Transaction_ID}</td>
                     <td className="px-4 py-3">{row.Inward_Date}</td>
@@ -1406,10 +1439,10 @@ export default function StockInwardPage() {
                     <td className="px-4 py-3">{row.Created_By}</td>
                   </tr>
                 ))}
-                {recentInwards.length === 0 && (
+                {filteredInwards.length === 0 && (
                   <tr>
                     <td colSpan={9} className="px-4 py-8 text-center text-gray-400">
-                      No stock inward records yet.
+                      {recentSearch ? 'No matching inward records found.' : 'No stock inward records yet.'}
                     </td>
                   </tr>
                 )}
