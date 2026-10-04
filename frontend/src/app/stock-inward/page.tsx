@@ -236,8 +236,8 @@ export default function StockInwardPage() {
       });
     } else {
       setMessage({
-        type: 'error',
-        text: `Item '${formData.Item_No}' not in catalog. You can enter details below to register it.`,
+        type: 'success',
+        text: `✨ New Item (#${formData.Item_No}): Item is not in catalog yet. Fill in the Item Name, Unit, and Quantity below — it will be automatically created in the items catalog and added to inventory!`,
       });
     }
   };
@@ -657,18 +657,31 @@ export default function StockInwardPage() {
                   </div>
                 </div>
 
-                {/* Current Stock Banner if selected */}
-                {formData.Current_Stock !== '' && (
+                {/* Current Stock Banner if existing, or New Item notice if new */}
+                {formData.Item_No && formData.Current_Stock !== '' && (
                   <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl px-4 py-2.5 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2 text-amber-900 font-medium">
                       <Info className="w-4 h-4 text-amber-600 shrink-0" />
                       <span>
-                        Current Stock in Excel for #{formData.Item_No}: <strong>{formData.Current_Stock} {formData.Unit}</strong>
-                        {formData.Langar_Qty ? ` (Langar Reference: ${formData.Langar_Qty} ${formData.Unit})` : ''}
+                        Catalog Item #{formData.Item_No} ({formData.Item_Name}): Current Stock is <strong>{formData.Current_Stock} {formData.Unit}</strong>
+                        {formData.Langar_Qty ? ` (Langar Requirement: ${formData.Langar_Qty} ${formData.Unit})` : ''}
                       </span>
                     </div>
                     <span className="text-[11px] font-bold text-amber-700 bg-amber-100/60 px-2 py-0.5 rounded-md">
-                      Active
+                      Existing Catalog Item
+                    </span>
+                  </div>
+                )}
+                {formData.Item_No && formData.Current_Stock === '' && (
+                  <div className="bg-blue-50/90 border border-blue-200 rounded-xl px-4 py-2.5 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 text-blue-900 font-medium">
+                      <PackagePlus className="w-4 h-4 text-blue-600 shrink-0" />
+                      <span>
+                        ✨ <strong>New Item Registration:</strong> Item <strong>#{formData.Item_No}</strong> will be automatically created in the Items Master database when saved!
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-bold text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-md">
+                      Auto-Create Item
                     </span>
                   </div>
                 )}
@@ -1003,13 +1016,14 @@ export default function StockInwardPage() {
                     <thead className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200">
                       <tr>
                         <th className="p-2.5 w-10">#</th>
-                        <th className="p-2.5 min-w-[180px]">Select Item *</th>
+                        <th className="p-2.5 min-w-[140px]">Item No *</th>
+                        <th className="p-2.5 min-w-[160px]">Item Name</th>
+                        <th className="p-2.5 w-24">Unit</th>
                         <th className="p-2.5 w-28">Packaging</th>
-                        <th className="p-2.5 w-24">Containers</th>
-                        <th className="p-2.5 w-24">Size/Unit</th>
+                        <th className="p-2.5 w-20">Count</th>
+                        <th className="p-2.5 w-20">Size</th>
                         <th className="p-2.5 w-28">Total Qty *</th>
-                        <th className="p-2.5 w-20">Unit</th>
-                        <th className="p-2.5 min-w-[150px]">Remarks / Packaging Note</th>
+                        <th className="p-2.5 min-w-[140px]">Remarks / Note</th>
                         <th className="p-2.5 w-12 text-center">Action</th>
                       </tr>
                     </thead>
@@ -1018,16 +1032,41 @@ export default function StockInwardPage() {
                         <tr key={row.id} className="hover:bg-gray-50/60">
                           <td className="p-2.5 text-gray-500 font-bold">{idx + 1}</td>
                           <td className="p-2.5">
-                            <select
+                            <input
+                              type="text"
+                              list={`bulk-item-list-${row.id}`}
                               value={row.Item_No}
                               onChange={(e) => updateBulkRow(row.id, 'Item_No', e.target.value)}
-                              className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-semibold"
+                              placeholder="e.g. 6745"
+                              className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-900"
                               required
-                            >
-                              <option value="">-- Choose Item --</option>
+                            />
+                            <datalist id={`bulk-item-list-${row.id}`}>
                               {items.map((i) => (
                                 <option key={i.Item_No} value={i.Item_No}>
-                                  #{i.Item_No} - {i.Item_Name} ({i.Unit})
+                                  {i.Item_Name} ({i.Unit})
+                                </option>
+                              ))}
+                            </datalist>
+                          </td>
+                          <td className="p-2.5">
+                            <input
+                              type="text"
+                              value={row.Item_Name}
+                              onChange={(e) => updateBulkRow(row.id, 'Item_Name', e.target.value)}
+                              placeholder="Item Name"
+                              className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-medium"
+                            />
+                          </td>
+                          <td className="p-2.5">
+                            <select
+                              value={row.Unit}
+                              onChange={(e) => updateBulkRow(row.id, 'Unit', e.target.value)}
+                              className="w-full p-2 bg-white border border-gray-300 rounded-lg text-xs font-bold"
+                            >
+                              {UNITS.map((u) => (
+                                <option key={u} value={u}>
+                                  {u}
                                 </option>
                               ))}
                             </select>
@@ -1076,7 +1115,6 @@ export default function StockInwardPage() {
                               required
                             />
                           </td>
-                          <td className="p-2.5 font-bold text-gray-700">{row.Unit || 'KG'}</td>
                           <td className="p-2.5">
                             <input
                               type="text"
