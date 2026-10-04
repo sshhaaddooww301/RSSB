@@ -51,18 +51,23 @@ async def lifespan(app: FastAPI):
     logger.info("RSSB Langar JSR starting up (Production Mode: %s) ...", settings.is_production)
     logger.info("CORS origins: %s", settings.CORS_ORIGINS)
 
-    # Auto-initialize Supabase / PostgreSQL if DATABASE_URL is set
+    import asyncio
+
+    # Non-blocking async DB schema initialization
     if settings.DATABASE_URL:
         try:
             from services.postgres_client import postgres_client
-            postgres_client.initialize_schema_if_needed()
+            await asyncio.to_thread(postgres_client.initialize_schema_if_needed)
             logger.info("✅ Supabase / PostgreSQL connected and schema verified.")
         except Exception as e:
             logger.error("❌ Supabase connection failed at startup: %s", e)
     else:
-        from services.excel_local import initialize_local_excel_if_needed
-        initialize_local_excel_if_needed()
-        logger.info("📂 Local Excel database initialized (no DATABASE_URL set).")
+        try:
+            from services.excel_local import initialize_local_excel_if_needed
+            await asyncio.to_thread(initialize_local_excel_if_needed)
+            logger.info("📂 Local Excel database initialized.")
+        except Exception as e:
+            logger.error("❌ Local Excel init failed: %s", e)
 
     yield
     logger.info("Shutting down ...")
