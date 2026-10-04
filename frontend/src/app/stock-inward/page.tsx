@@ -21,6 +21,8 @@ import {
   Shield,
   Eye,
   Download,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
 import { getItems, createStockInward, getStockInward, getCurrentUser, isUserViewer } from '@/lib/api';
@@ -85,6 +87,8 @@ export default function StockInwardPage() {
   const [packCount, setPackCount] = useState('100');
   const [packSize, setPackSize] = useState('30');
   const [recentSearch, setRecentSearch] = useState('');
+  const [recentPage, setRecentPage] = useState(1);
+  const [recentPageSize, setRecentPageSize] = useState(25);
 
   const [formData, setFormData] = useState({
     Item_No: '',
@@ -595,6 +599,11 @@ export default function StockInwardPage() {
       (r.Remarks || '').toLowerCase().includes(q)
     );
   });
+
+  const totalPages = recentPageSize === 0 ? 1 : Math.ceil(filteredInwards.length / recentPageSize) || 1;
+  const paginatedInwards = recentPageSize === 0
+    ? filteredInwards
+    : filteredInwards.slice((recentPage - 1) * recentPageSize, recentPage * recentPageSize);
 
   return (
     <AppLayout>
@@ -1426,7 +1435,7 @@ export default function StockInwardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-medium">
-                {filteredInwards.slice(0, 30).map((row, idx) => (
+                {paginatedInwards.map((row, idx) => (
                   <tr key={idx} className="hover:bg-red-50/20 transition">
                     <td className="px-4 py-3 font-semibold text-gray-900">{row.Transaction_ID}</td>
                     <td className="px-4 py-3">{row.Inward_Date}</td>
@@ -1449,6 +1458,64 @@ export default function StockInwardPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Controls */}
+          {filteredInwards.length > 0 && (
+            <div className="p-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500">
+              <div className="flex items-center space-x-2">
+                <span>
+                  Showing {recentPageSize === 0 ? 1 : (recentPage - 1) * recentPageSize + 1} to{' '}
+                  {recentPageSize === 0 ? filteredInwards.length : Math.min(recentPage * recentPageSize, filteredInwards.length)} of {filteredInwards.length} records
+                </span>
+                <span className="text-gray-300">|</span>
+                <label className="flex items-center space-x-1.5 font-medium">
+                  <span>Show:</span>
+                  <select
+                    value={recentPageSize}
+                    onChange={(e) => {
+                      setRecentPageSize(Number(e.target.value));
+                      setRecentPage(1);
+                    }}
+                    className="px-2 py-1 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 cursor-pointer"
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={0}>All ({filteredInwards.length})</option>
+                  </select>
+                </label>
+              </div>
+
+              {recentPageSize > 0 && totalPages > 1 && (
+                <div className="flex items-center space-x-1">
+                  <button
+                    type="button"
+                    onClick={() => setRecentPage((p) => Math.max(1, p - 1))}
+                    disabled={recentPage === 1}
+                    className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                    title="Previous page"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+
+                  <span className="px-3 py-1 bg-emerald-50 text-emerald-700 font-bold rounded-lg border border-emerald-200 text-xs">
+                    Page {recentPage} of {totalPages}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => setRecentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={recentPage === totalPages}
+                    className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                    title="Next page"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </AppLayout>
