@@ -133,18 +133,18 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-2">
             <Link
-              href="/inventory"
-              className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold shadow-xs transition"
+              href="/stock-inward"
+              className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold shadow-xs transition"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Item</span>
+              <ArrowDownLeft className="w-3.5 h-3.5" />
+              <span>+ Stock Inward / Add Item</span>
             </Link>
             <Link
-              href="/stock-inward"
-              className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-white border border-red-200 text-red-700 hover:bg-red-50 rounded-xl text-xs font-semibold shadow-2xs transition"
+              href="/inventory"
+              className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl text-xs font-semibold shadow-2xs transition"
             >
-              <ArrowDownLeft className="w-3.5 h-3.5 text-red-600" />
-              <span>Stock In</span>
+              <Boxes className="w-3.5 h-3.5 text-gray-600" />
+              <span>Stock Overview</span>
             </Link>
             <Link
               href="/stock-outward"
