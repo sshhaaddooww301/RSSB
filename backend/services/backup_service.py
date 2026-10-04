@@ -201,9 +201,15 @@ async def save_daily_backup_snapshot() -> str:
             ]
             for k, v in data.items()
         }
-    }
     with open(json_filepath, "w", encoding="utf-8") as jf:
         json.dump(sanitized_data, jf, indent=2, ensure_ascii=False)
+
+    # Also attempt auto-sync to OneDrive / SharePoint folder if Graph API is configured
+    try:
+        if graph_client._is_configured():
+            await graph_client.upload_file_to_drive("RSSB_Backups", filename, excel_bytes)
+    except Exception as e:
+        logger.warning("OneDrive backup upload skipped or failed: %s", e)
 
     # Cleanup old backups (keep latest 45 days)
     await cleanup_old_backups(max_days=45)

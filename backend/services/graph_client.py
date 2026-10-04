@@ -136,6 +136,35 @@ class GraphClient:
     async def _delete(self, url: str) -> dict:
         return await self._request("DELETE", url)
 
+    async def upload_file_to_drive(self, folder_path: str, filename: str, content_bytes: bytes) -> Optional[dict]:
+        """Upload a file (e.g. backup .xlsx) to OneDrive/SharePoint via Graph API."""
+        if not self._is_configured():
+            return None
+        try:
+            token = await self._get_access_token()
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            }
+            clean_folder = folder_path.strip("/")
+            drive_id = settings.EXCEL_DRIVE_ID
+            if drive_id:
+                url = f"{settings.GRAPH_BASE_URL}/drives/{drive_id}/root:/{clean_folder}/{filename}:/content"
+            else:
+                url = f"{settings.GRAPH_BASE_URL}/me/drive/root:/{clean_folder}/{filename}:/content"
+
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                resp = await client.put(url, headers=headers, content=content_bytes)
+            if resp.status_code in (200, 201):
+                logger.info("✅ Successfully uploaded backup to OneDrive: /%s/%s", clean_folder, filename)
+                return resp.json()
+            else:
+                logger.warning("OneDrive backup upload returned %s: %s", resp.status_code, resp.text[:300])
+                return None
+        except Exception as e:
+            logger.warning("Failed to upload backup to OneDrive: %s", e)
+            return None
+
     def _is_configured(self) -> bool:
         return bool(
             settings.MICROSOFT_CLIENT_ID
