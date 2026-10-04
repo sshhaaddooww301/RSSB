@@ -33,6 +33,7 @@ export default function InventoryPage() {
     Item_Name: '',
     SKU: '', // Stores Langar Requirement
     Unit: 'QTL',
+    Opening_Qty: '0',
     Langar_Qty: '0',
     Minimum_Stock: '20',
     Critical_Stock: '5',
@@ -45,7 +46,6 @@ export default function InventoryPage() {
   const [deleteConfirmItem, setDeleteConfirmItem] = useState<any | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-
 
   const fetchItems = async () => {
     try {
@@ -72,6 +72,7 @@ export default function InventoryPage() {
       Item_Name: '',
       SKU: '',
       Unit: 'QTL',
+      Opening_Qty: '0',
       Langar_Qty: '0',
       Minimum_Stock: '20',
       Critical_Stock: '5',
@@ -88,6 +89,7 @@ export default function InventoryPage() {
       Item_Name: item.Item_Name,
       SKU: item.SKU || item.Langar_Requirement || '',
       Unit: item.Unit,
+      Opening_Qty: String(item.Opening_Qty ?? item.Current_Stock ?? 0),
       Langar_Qty: String(item.Langar_Qty || 0),
       Minimum_Stock: String(item.Minimum_Stock || 0),
       Critical_Stock: String(item.Critical_Stock || 0),
@@ -114,7 +116,7 @@ export default function InventoryPage() {
           SKU: modalForm.SKU,
           Langar_Requirement: modalForm.SKU,
           Unit: modalForm.Unit,
-          Opening_Qty: parseFloat(editingItem.Opening_Qty || 0),
+          Opening_Qty: parseFloat(modalForm.Opening_Qty) || 0,
           Langar_Qty: parseFloat(modalForm.Langar_Qty) || 0,
           Minimum_Stock: parseFloat(modalForm.Minimum_Stock) || 0,
           Critical_Stock: parseFloat(modalForm.Critical_Stock) || 0,
@@ -128,7 +130,7 @@ export default function InventoryPage() {
           SKU: modalForm.SKU,
           Langar_Requirement: modalForm.SKU,
           Unit: modalForm.Unit,
-          Opening_Qty: 0,
+          Opening_Qty: parseFloat(modalForm.Opening_Qty) || 0,
           Langar_Qty: parseFloat(modalForm.Langar_Qty) || 0,
           Minimum_Stock: parseFloat(modalForm.Minimum_Stock) || 0,
           Critical_Stock: parseFloat(modalForm.Critical_Stock) || 0,
@@ -138,6 +140,7 @@ export default function InventoryPage() {
 
       setIsModalOpen(false);
       fetchItems();
+
     } catch (err: any) {
       setModalError(err.message || 'Failed to save item.');
     } finally {
@@ -392,7 +395,19 @@ export default function InventoryPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block font-semibold text-gray-700 mb-1">
+                      Opening / Base Stock
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={modalForm.Opening_Qty}
+                      onChange={(e) => setModalForm({ ...modalForm, Opening_Qty: e.target.value })}
+                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl font-bold text-gray-900 focus:ring-2 focus:ring-red-500/20"
+                    />
+                  </div>
                   <div>
                     <label className="block font-semibold text-gray-700 mb-1">Langar Qty</label>
                     <input
@@ -424,6 +439,7 @@ export default function InventoryPage() {
                     />
                   </div>
                 </div>
+
 
                 <div className="pt-3 flex items-center justify-between border-t border-gray-100">
                   {editingItem ? (
