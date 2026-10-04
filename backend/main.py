@@ -89,16 +89,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — wildcard origin cannot be combined with allow_credentials=True (CORS spec violation)
-_cors_origins = settings.CORS_ORIGINS
-_allow_credentials = "*" not in _cors_origins
+# CORS — allow credentials with regex for Vercel apps & local dev
+_raw_origins = [o.strip() for o in settings.CORS_ORIGINS if o.strip() and o.strip() != "*"]
+_default_origins = [
+    "https://rssb-langar-frontend.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:8008",
+]
+_cors_origins = list(set(_raw_origins + _default_origins))
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
-    allow_credentials=_allow_credentials,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_origin_regex=r"https://.*\.vercel\.app|http://localhost:\d+",
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["*"],
 )
 
 
@@ -106,6 +112,10 @@ app.add_middleware(
 
 @app.middleware("http")
 async def security_and_rate_limit_middleware(request: Request, call_next):
+    # Always allow OPTIONS preflight requests immediately
+    if request.method == "OPTIONS":
+        return await call_next(request)
+
     # Extract client IP
     client_ip = request.client.host if request.client else "unknown"
     now = time.time()
