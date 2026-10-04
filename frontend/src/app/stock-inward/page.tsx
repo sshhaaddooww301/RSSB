@@ -20,6 +20,7 @@ import {
   Package,
   Shield,
   Eye,
+  Download,
 } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
 import { getItems, createStockInward, getStockInward, getCurrentUser, isUserViewer } from '@/lib/api';
@@ -131,6 +132,55 @@ export default function StockInwardPage() {
       setIsViewer(true);
     }
   }, []);
+
+  const handleExportInwardCSV = () => {
+    if (!recentInwards || recentInwards.length === 0) {
+      alert('No stock inward records to export.');
+      return;
+    }
+    const headers = [
+      'Transaction ID',
+      'Inward Date',
+      'Item No',
+      'Item Name',
+      'SKU',
+      'Unit',
+      'Quantity',
+      'Supplier',
+      'Invoice No',
+      'Storage Location',
+      'Packaging / Remarks',
+      'Created By',
+      'Created At',
+    ];
+    const rows = [
+      headers.join(','),
+      ...recentInwards.map((r) =>
+        [
+          `"${r.Transaction_ID || ''}"`,
+          `"${r.Inward_Date || ''}"`,
+          `"${r.Item_No || ''}"`,
+          `"${(r.Item_Name || '').replace(/"/g, '""')}"`,
+          `"${(r.SKU || '').replace(/"/g, '""')}"`,
+          `"${r.Unit || ''}"`,
+          `"${r.Quantity || 0}"`,
+          `"${(r.Supplier || '').replace(/"/g, '""')}"`,
+          `"${(r.Invoice_No || '').replace(/"/g, '""')}"`,
+          `"${(r.Storage_Location || '').replace(/"/g, '""')}"`,
+          `"${(r.Remarks || '').replace(/"/g, '""')}"`,
+          `"${(r.Created_By || '').replace(/"/g, '""')}"`,
+          `"${r.Created_At || ''}"`,
+        ].join(',')
+      ),
+    ];
+    const blob = new Blob(['\uFEFF' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `Stock_Inward_Records_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
 
   const handleSelectPackageType = (ptLabel: string) => {
     const pkg = PACKAGE_TYPES.find((p) => p.label === ptLabel);
@@ -1310,9 +1360,22 @@ export default function StockInwardPage() {
 
         {/* Recent Inwards Table */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
-          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="text-sm font-bold text-gray-900">Recent Stock Inward Records</h3>
-            <span className="text-xs text-gray-400">Live synced from Excel database</span>
+          <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-gray-900">Recent Stock Inward Records</h3>
+              <p className="text-[11px] text-gray-500">Live synced from Excel database</p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={handleExportInwardCSV}
+                className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+                title="Download all inward records as CSV"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export CSV ({recentInwards.length})</span>
+              </button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-gray-600">

@@ -19,6 +19,7 @@ import {
   Edit2,
   Trash2,
   X,
+  Download,
 } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
 import {
@@ -128,6 +129,57 @@ export default function StockOutwardPage() {
     const u = getCurrentUser();
     if (u) setCurrentUser(u);
   }, []);
+
+  const handleExportOutwardCSV = () => {
+    if (!recentOutwards || recentOutwards.length === 0) {
+      alert('No stock outward records to export.');
+      return;
+    }
+    const headers = [
+      'Transaction ID',
+      'Outward Date',
+      'Item No',
+      'Item Name',
+      'SKU',
+      'Unit',
+      'Quantity',
+      'Department',
+      'Issued To',
+      'Receiver Name',
+      'Purpose',
+      'Packaging / Remarks',
+      'Created By',
+      'Created At',
+    ];
+    const rows = [
+      headers.join(','),
+      ...recentOutwards.map((r) =>
+        [
+          `"${r.Transaction_ID || ''}"`,
+          `"${r.Outward_Date || ''}"`,
+          `"${r.Item_No || ''}"`,
+          `"${(r.Item_Name || '').replace(/"/g, '""')}"`,
+          `"${(r.SKU || '').replace(/"/g, '""')}"`,
+          `"${r.Unit || ''}"`,
+          `"${r.Quantity || 0}"`,
+          `"${(r.Department || '').replace(/"/g, '""')}"`,
+          `"${(r.Issued_To || '').replace(/"/g, '""')}"`,
+          `"${(r.Receiver_Name || '').replace(/"/g, '""')}"`,
+          `"${(r.Purpose || '').replace(/"/g, '""')}"`,
+          `"${(r.Remarks || '').replace(/"/g, '""')}"`,
+          `"${(r.Created_By || '').replace(/"/g, '""')}"`,
+          `"${r.Created_At || ''}"`,
+        ].join(',')
+      ),
+    ];
+    const blob = new Blob(['\uFEFF' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `Stock_Outward_Records_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
 
   const handleSelectPackageType = (ptLabel: string) => {
     const pkg = PACKAGE_TYPES.find((p) => p.label === ptLabel);
@@ -1009,12 +1061,22 @@ export default function StockOutwardPage() {
 
         {/* Recent Outwards Table */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
-          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-bold text-gray-900">Recent Stock Outward Issues</h3>
               <p className="text-[11px] text-gray-500">Click &quot;Edit&quot; under Actions to modify any outward record</p>
             </div>
-            <span className="text-xs text-gray-400">Live synced from Excel database</span>
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={handleExportOutwardCSV}
+                className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
+                title="Download all outward records as CSV"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export CSV ({recentOutwards.length})</span>
+              </button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-gray-600">
