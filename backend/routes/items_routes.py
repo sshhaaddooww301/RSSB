@@ -35,8 +35,8 @@ async def get_item(item_no: str, user: dict = Depends(get_current_user)):
 
 @router.post("")
 async def create_item(body: ItemCreate, request: Request, user: dict = Depends(require_roles("ADMIN", "MANAGER"))):
-    # Validate unit
-    if body.Unit.value not in settings.VALID_UNITS:
+    unit_val = str(getattr(body.Unit, "value", body.Unit)).strip().upper()
+    if unit_val not in settings.VALID_UNITS:
         raise HTTPException(status_code=400, detail=f"Invalid unit. Must be one of: {', '.join(settings.VALID_UNITS)}")
 
     # Check for duplicates
@@ -45,13 +45,15 @@ async def create_item(body: ItemCreate, request: Request, user: dict = Depends(r
         raise HTTPException(status_code=409, detail=f"Item {body.Item_No} already exists")
 
     try:
-        result = await excel_service.create_item(body.model_dump())
+        dump = body.model_dump()
+        dump["Unit"] = unit_val
+        result = await excel_service.create_item(dump)
         await excel_service.create_audit_log({
             "User": user.get("Username", ""),
             "Action": "Create Item",
             "Module": "Items",
             "Item_No": body.Item_No,
-            "Details": f"Created item {body.Item_Name} ({body.Unit.value})",
+            "Details": f"Created item {body.Item_Name} ({unit_val})",
             "IP_Address": request.client.host if request.client else "",
         })
         return ApiResponse(message="Item created successfully", data=result)
@@ -64,7 +66,7 @@ async def update_item(item_no: str, body: ItemUpdate, request: Request, user: di
     try:
         update_data = body.model_dump(exclude_none=True)
         if "Unit" in update_data:
-            update_data["Unit"] = update_data["Unit"].value
+            update_data["Unit"] = str(getattr(update_data["Unit"], "value", update_data["Unit"])).strip().upper()
         result = await excel_service.update_item(item_no, update_data)
         await excel_service.create_audit_log({
             "User": user.get("Username", ""),
@@ -77,6 +79,7 @@ async def update_item(item_no: str, body: ItemUpdate, request: Request, user: di
         return ApiResponse(message="Item updated successfully", data=result)
     except GraphClientError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
+
 
 
 @router.delete("/{item_no}")

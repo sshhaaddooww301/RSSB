@@ -83,7 +83,7 @@ class ItemBase(BaseModel):
     Item_Name: str
     SKU: Optional[str] = ""
     Langar_Requirement: Optional[str] = ""
-    Unit: UnitType
+    Unit: str = "KG"
     Opening_Qty: float = 0
     Langar_Qty: float = 0
     Minimum_Stock: float = 0
@@ -99,12 +99,13 @@ class ItemUpdate(BaseModel):
     Item_Name: Optional[str] = None
     SKU: Optional[str] = None
     Langar_Requirement: Optional[str] = None
-    Unit: Optional[UnitType] = None
+    Unit: Optional[str] = None
     Opening_Qty: Optional[float] = None
     Langar_Qty: Optional[float] = None
     Minimum_Stock: Optional[float] = None
     Critical_Stock: Optional[float] = None
     Status: Optional[ItemStatusType] = None
+
 
 
 class Item(ItemBase):
