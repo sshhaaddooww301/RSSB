@@ -21,12 +21,14 @@ Base = declarative_base()
 
 
 def _get_clean_db_url(url: str) -> str:
-    """Ensure standard postgresql:// URL prefix."""
+    """Ensure standard postgresql+psycopg2:// URL prefix."""
     if not url:
         return ""
     clean = url.strip()
     if clean.startswith("postgres://"):
-        clean = "postgresql://" + clean[len("postgres://"):]
+        clean = "postgresql+psycopg2://" + clean[len("postgres://"):]
+    elif clean.startswith("postgresql://") and not clean.startswith("postgresql+"):
+        clean = "postgresql+psycopg2://" + clean[len("postgresql://"):]
     return clean
 
 

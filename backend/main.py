@@ -197,7 +197,7 @@ async def general_error_handler(request: Request, exc: Exception):
         status_code=500,
         content={
             "success": False,
-            "message": f"Server error: {type(exc).__name__}: {str(exc)}",
+            "message": "A secure server error occurred. Please try again later.",
         },
     )
 
