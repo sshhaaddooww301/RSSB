@@ -21,10 +21,15 @@ Base = declarative_base()
 
 
 def _get_clean_db_url(url: str) -> str:
-    """Ensure standard postgresql+psycopg2:// URL prefix."""
+    """Ensure standard postgresql+psycopg2:// URL prefix and IPv4 pooler for Supabase."""
     if not url:
         return ""
     clean = url.strip()
+    if "db.srupwyzkuckchlipvhap.supabase.co" in clean:
+        clean = clean.replace("db.srupwyzkuckchlipvhap.supabase.co:5432", "aws-0-ap-northeast-1.pooler.supabase.com:6543")
+        clean = clean.replace("db.srupwyzkuckchlipvhap.supabase.co", "aws-0-ap-northeast-1.pooler.supabase.com:6543")
+        if "postgres.srupwyzkuckchlipvhap" not in clean:
+            clean = clean.replace("postgres:", "postgres.srupwyzkuckchlipvhap:")
     if clean.startswith("postgres://"):
         clean = "postgresql+psycopg2://" + clean[len("postgres://"):]
     elif clean.startswith("postgresql://") and not clean.startswith("postgresql+"):
