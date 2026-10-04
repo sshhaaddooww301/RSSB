@@ -5,7 +5,7 @@ Stock Outward routes — record goods issued to departments.
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from auth import get_current_user, require_roles
-from models import StockOutwardCreate, ApiResponse
+from models import StockOutwardCreate, StockOutwardUpdate, ApiResponse
 from services import excel_service
 from services.graph_client import GraphClientError
 
@@ -47,3 +47,54 @@ async def create_outward(
         raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Outward recording failed: {str(e)}")
+
+
+@router.put("/{transaction_id}")
+async def update_outward(
+    transaction_id: str,
+    body: StockOutwardUpdate,
+    request: Request,
+    user: dict = Depends(require_roles("ADMIN", "MANAGER", "STAFF")),
+):
+    try:
+        data_dict = body.model_dump(mode="json", exclude_none=True)
+        result = await excel_service.update_stock_outward(
+            transaction_id, data_dict, username=user.get("Username", "")
+        )
+        await excel_service.create_audit_log({
+            "User": user.get("Username", ""),
+            "Action": "Update Outward",
+            "Module": "Stock Outward",
+            "Transaction_ID": transaction_id,
+            "Item_No": result.get("Item_No", ""),
+            "Details": f"Updated outward txn {transaction_id} ({result.get('Quantity')} {result.get('Unit')} to {result.get('Department')})",
+            "IP_Address": request.client.host if request.client else "",
+        })
+        return ApiResponse(message="Stock outward updated successfully", data=result)
+    except GraphClientError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Outward update failed: {str(e)}")
+
+
+@router.delete("/{transaction_id}")
+async def delete_outward(
+    transaction_id: str,
+    request: Request,
+    user: dict = Depends(require_roles("ADMIN")),
+):
+    try:
+        result = await excel_service.delete_stock_outward(transaction_id)
+        await excel_service.create_audit_log({
+            "User": user.get("Username", ""),
+            "Action": "Delete Outward",
+            "Module": "Stock Outward",
+            "Transaction_ID": transaction_id,
+            "Details": f"Deleted outward txn {transaction_id}",
+            "IP_Address": request.client.host if request.client else "",
+        })
+        return ApiResponse(message="Stock outward deleted successfully", data=result)
+    except GraphClientError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Outward deletion failed: {str(e)}")

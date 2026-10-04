@@ -238,6 +238,46 @@ class StockOutwardCreate(BaseModel):
 
 
 
+class StockOutwardUpdate(BaseModel):
+    Item_No: Optional[str] = None
+    Item_Name: Optional[str] = None
+    SKU: Optional[str] = None
+    Unit: Optional[str] = None
+    Outward_Date: Optional[str] = None
+    Quantity: Optional[float] = None
+    Department: Optional[DepartmentName] = None
+    Issued_To: Optional[str] = None
+    Receiver_Name: Optional[str] = None
+    Purpose: Optional[str] = None
+    Remarks: Optional[str] = None
+
+    @field_validator("Department", mode="before")
+    @classmethod
+    def validate_department(cls, v: object) -> Optional[DepartmentName]:
+        if v is None:
+            return None
+        if isinstance(v, DepartmentName):
+            return v
+        if hasattr(v, "value"):
+            v = getattr(v, "value")
+        s = str(v).strip()
+        if "DepartmentName." in s:
+            s = s.split("DepartmentName.")[-1].strip()
+        if s.lower() in ("canteen", "can"):
+            return DepartmentName.CANTEEN
+        elif s.lower() in ("langar", "lng"):
+            return DepartmentName.LANGAR
+        try:
+            return DepartmentName(s)
+        except Exception:
+            pass
+        try:
+            return DepartmentName[s.upper()]
+        except Exception:
+            pass
+        raise ValueError("Department must ONLY be Canteen or Langar")
+
+
 class StockOutward(BaseModel):
     Transaction_ID: str = ""
     Outward_Date: str = ""

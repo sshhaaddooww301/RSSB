@@ -483,6 +483,90 @@ async def get_all_outward() -> list[dict]:
     return await graph_client.get_table_data(settings.TABLE_STOCK_OUTWARD)
 
 
+async def update_stock_outward(txn_id: str, data: dict, username: str) -> dict:
+    row_idx = await graph_client.find_row_index(settings.TABLE_STOCK_OUTWARD, "Transaction_ID", txn_id)
+    if row_idx is None:
+        raise GraphClientError(f"Transaction '{txn_id}' not found", 404)
+
+    existing_rows = await graph_client.find_rows(settings.TABLE_STOCK_OUTWARD, "Transaction_ID", txn_id)
+    if not existing_rows:
+        raise GraphClientError(f"Transaction '{txn_id}' not found", 404)
+    existing = existing_rows[0]
+
+    item_no = str(data.get("Item_No", existing.get("Item_No", ""))).strip()
+    quantity = _to_float(data.get("Quantity", existing.get("Quantity", 0)))
+    if quantity <= 0:
+        raise GraphClientError("Quantity must be greater than 0", 400)
+
+    # Department validation
+    raw_dept = data.get("Department", existing.get("Department", "Langar"))
+    if hasattr(raw_dept, "value"):
+        dept_str = str(raw_dept.value).strip()
+    elif hasattr(raw_dept, "name"):
+        dept_str = str(raw_dept.name).strip()
+    else:
+        dept_str = str(raw_dept).strip()
+
+    if "DepartmentName." in dept_str:
+        dept_str = dept_str.split("DepartmentName.")[-1].strip()
+    dept_clean = dept_str.lower()
+    if dept_clean in ("canteen", "can"):
+        department = "Canteen"
+    elif dept_clean in ("langar", "lng"):
+        department = "Langar"
+    else:
+        department = "Langar"
+
+    item = await get_item_by_no(item_no)
+    item_name = str(data.get("Item_Name", existing.get("Item_Name", ""))).strip() or (item.get("Item_Name", "") if item else f"Item {item_no}")
+    sku = str(data.get("SKU", existing.get("SKU", ""))).strip() or (item.get("SKU", "") if item else item_no)
+    item_unit = str(data.get("Unit", existing.get("Unit", "KG"))).strip() or (item.get("Unit", "KG") if item else "KG")
+
+    outward_date = data.get("Outward_Date", existing.get("Outward_Date", _today_str()))
+    now = _now_str()
+
+    values = [
+        txn_id,
+        outward_date,
+        item_no,
+        item_name,
+        sku,
+        item_unit,
+        quantity,
+        department,
+        data.get("Issued_To", existing.get("Issued_To", "")),
+        data.get("Receiver_Name", existing.get("Receiver_Name", "")),
+        data.get("Purpose", existing.get("Purpose", "")),
+        data.get("Remarks", existing.get("Remarks", "")),
+        existing.get("Created_By", username),
+        existing.get("Created_At", now),
+    ]
+    await graph_client.update_table_row(settings.TABLE_STOCK_OUTWARD, row_idx, values)
+    return {
+        "Transaction_ID": txn_id,
+        "Item_No": item_no,
+        "Item_Name": item_name,
+        "Quantity": quantity,
+        "Unit": item_unit,
+        "Department": department,
+        "updated": True,
+    }
+
+
+async def delete_stock_outward(txn_id: str) -> dict:
+    row_idx = await graph_client.find_row_index(settings.TABLE_STOCK_OUTWARD, "Transaction_ID", txn_id)
+    if row_idx is None:
+        raise GraphClientError(f"Transaction '{txn_id}' not found", 404)
+
+    await graph_client.delete_table_row(
+        settings.TABLE_STOCK_OUTWARD,
+        row_index=row_idx,
+        key_col="Transaction_ID",
+        key_val=txn_id,
+    )
+    return {"Transaction_ID": txn_id, "deleted": True}
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # DEPARTMENTS
 # ═══════════════════════════════════════════════════════════════════════
