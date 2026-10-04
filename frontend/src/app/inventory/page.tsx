@@ -225,7 +225,7 @@ export default function InventoryPage() {
           Status: modalForm.Status,
         });
       } else {
-        // Create New Item in Catalog
+        // Create New Item in Catalog (Opening_Qty is base starting stock)
         await createItem({
           Item_No: modalForm.Item_No.trim(),
           Item_Name: modalForm.Item_Name.trim(),
@@ -238,26 +238,6 @@ export default function InventoryPage() {
           Critical_Stock: parseFloat(modalForm.Critical_Stock) || 0,
           Status: modalForm.Status,
         });
-
-        // Also record an initial Stock Inward transaction if quantity > 0
-        if (startingQty > 0) {
-          try {
-            await createStockInward({
-              Item_No: modalForm.Item_No.trim(),
-              Item_Name: modalForm.Item_Name.trim(),
-              SKU: modalForm.SKU.trim(),
-              Unit: modalForm.Unit,
-              Inward_Date: new Date().toISOString().split('T')[0],
-              Quantity: startingQty,
-              Supplier: 'Initial Inward / Add Item',
-              Invoice_No: 'OPENING',
-              Storage_Location: 'Main Kitchen / Store',
-              Remarks: modalForm.Remarks.trim() || `Initial Inward: ${startingQty} ${modalForm.Unit}`,
-            });
-          } catch (inwErr) {
-            console.warn('Initial inward note:', inwErr);
-          }
-        }
       }
 
       setIsModalOpen(false);
