@@ -69,7 +69,8 @@ class Settings:
     TABLE_BARTAN_INWARD: str = "BARTAN_INWARD"
 
     # Valid units
-    VALID_UNITS: list[str] = ["KG", "QTL", "LITRE", "PACKET", "PIECE"]
+    VALID_UNITS: list[str] = ["KG", "QTL", "LITRE", "PKT", "PACKET", "TIN", "PIECE", "LTR", "LITRES", "TINS", "PKTS"]
+
 
     # Valid departments
     VALID_DEPARTMENTS: list[str] = ["Canteen", "Langar"]

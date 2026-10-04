@@ -15,11 +15,33 @@ class UnitType(str, Enum):
     KG = "KG"
     QTL = "QTL"
     LITRE = "LITRE"
+    PKT = "PKT"
     PACKET = "PACKET"
+    TIN = "TIN"
     PIECE = "PIECE"
+
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, str):
+            val_upper = value.strip().upper()
+            if val_upper in ("PKTS", "PACKETS", "PKT", "PACKET"):
+                return cls.PKT
+            if val_upper in ("TINS", "TIN"):
+                return cls.TIN
+            if val_upper in ("LTR", "LITRES", "LITER", "LITERS", "LITRE"):
+                return cls.LITRE
+            if val_upper in ("QUINTAL", "QUINTALS", "QTL"):
+                return cls.QTL
+            if val_upper in ("KGS", "KILOGRAM", "KG"):
+                return cls.KG
+            for member in cls:
+                if member.value.upper() == val_upper:
+                    return member
+        return None
 
 
 class StockStatus(str, Enum):
+
     IN_STOCK = "IN STOCK"
     LOW_STOCK = "LOW STOCK"
     CRITICAL = "CRITICAL"
