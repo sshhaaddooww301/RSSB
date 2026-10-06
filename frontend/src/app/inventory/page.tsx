@@ -36,22 +36,6 @@ import {
 } from '@/lib/api';
 
 const UNITS = ['QTL', 'KG', 'PKT', 'LITRE', 'TIN'];
-const PACKAGE_TYPES = [
-  { label: 'Bags / Sacks', singular: 'Bag', defaultSize: '30', defaultUnit: 'KG', quickSizes: [5, 10, 20, 25, 30, 50, 100] },
-  { label: 'Tins / Cans', singular: 'Tin', defaultSize: '15', defaultUnit: 'LITRE', quickSizes: [1, 2, 5, 10, 15, 20] },
-  { label: 'Packets / Pouches', singular: 'Packet', defaultSize: '1', defaultUnit: 'PKT', quickSizes: [0.5, 1, 2, 5, 10, 25] },
-  { label: 'Boxes / Cartons', singular: 'Box', defaultSize: '24', defaultUnit: 'PKT', quickSizes: [6, 12, 20, 24, 48, 100] },
-  { label: 'Drums / Barrels', singular: 'Drum', defaultSize: '200', defaultUnit: 'LITRE', quickSizes: [50, 100, 200, 250] },
-  { label: 'Units / Pieces', singular: 'Unit', defaultSize: '1', defaultUnit: 'KG', quickSizes: [1, 2, 5, 10, 50] },
-];
-
-const QUICK_SIZES_BY_UNIT: Record<string, number[]> = {
-  QTL: [1, 2, 5, 10, 20, 50, 100],
-  KG: [5, 10, 20, 25, 30, 50, 100],
-  PKT: [6, 12, 24, 50, 100, 200],
-  LITRE: [1, 2, 5, 10, 15, 20, 200],
-  TIN: [1, 2, 5, 10, 15, 20, 50],
-};
 
 export default function InventoryPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -68,12 +52,6 @@ export default function InventoryPage() {
   // Modal State for adding/editing item
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any | null>(null);
-
-  // Packaging & Quantity Calculator State for Add Item
-  const [calcMode, setCalcMode] = useState<'package' | 'direct'>('package');
-  const [packageType, setPackageType] = useState('Bags / Sacks');
-  const [packCount, setPackCount] = useState('');
-  const [packSize, setPackSize] = useState('30');
 
   const [modalForm, setModalForm] = useState({
     Item_No: '',
@@ -116,49 +94,13 @@ export default function InventoryPage() {
     if (u) setCurrentUser(u);
   }, []);
 
-  const handleSelectPackageType = (typeLabel: string) => {
-    setPackageType(typeLabel);
-    const selectedPkg = PACKAGE_TYPES.find((p) => p.label === typeLabel);
-    if (selectedPkg) {
-      setPackSize(selectedPkg.defaultSize);
-      if (!editingItem && modalForm.Unit !== selectedPkg.defaultUnit && modalForm.Unit !== 'QTL') {
-        setModalForm((prev) => ({ ...prev, Unit: selectedPkg.defaultUnit }));
-      }
-    }
-  };
-
-  // Update calculated quantity when packCount, packSize or packageType changes
-  useEffect(() => {
-    if (calcMode === 'package') {
-      const count = parseFloat(packCount) || 0;
-      const size = parseFloat(packSize) || 0;
-      const total = count * size;
-      const selectedPkg = PACKAGE_TYPES.find((p) => p.label === packageType);
-      const pkgLabel = selectedPkg ? selectedPkg.singular : 'Pack';
-
-      setModalForm((prev) => ({
-        ...prev,
-        Opening_Qty: total > 0 ? String(total) : '',
-        Current_Stock: total > 0 ? String(total) : '',
-        Remarks:
-          count > 0 && size > 0
-            ? `${count} ${pkgLabel}s @ ${size} ${prev.Unit}/${pkgLabel.toLowerCase()}`
-            : prev.Remarks,
-      }));
-    }
-  }, [packCount, packSize, packageType, calcMode, modalForm.Unit]);
-
   const openAddModal = () => {
     setEditingItem(null);
-    setCalcMode('direct');
-    setPackageType('Bags / Sacks');
-    setPackCount('');
-    setPackSize('30');
     setModalForm({
       Item_No: '',
       Item_Name: '',
       SKU: '',
-      Unit: 'QTL',
+      Unit: 'KG',
       Opening_Qty: '0',
       Current_Stock: '0',
       Langar_Qty: '0',
@@ -174,16 +116,6 @@ export default function InventoryPage() {
   const openEditModal = (item: any) => {
     setEditingItem(item);
     const itemUnit = String(item.Unit || 'KG').toUpperCase();
-    const isOilOrLiquid = itemUnit === 'LITRE' || itemUnit === 'TIN';
-    const pkgType = isOilOrLiquid ? 'Tins / Cans' : 'Bags / Sacks';
-    const pSize = isOilOrLiquid ? '15' : '30';
-    const currentStockNum = parseFloat(item.Current_Stock) || 0;
-    const estimatedPacks = currentStockNum > 0 ? String(Math.round(currentStockNum / parseFloat(pSize))) : '1';
-
-    setCalcMode('direct');
-    setPackageType(pkgType);
-    setPackSize(pSize);
-    setPackCount(estimatedPacks);
 
     setModalForm({
       Item_No: String(item.Item_No),
@@ -203,16 +135,6 @@ export default function InventoryPage() {
   };
 
   const handleUnitChange = (newUnit: string) => {
-    const isOilOrLiquid = newUnit === 'LITRE' || newUnit === 'TIN';
-    if (isOilOrLiquid) {
-      setPackageType('Tins / Cans');
-      setPackSize('15');
-      setPackCount((prev) => prev || '20');
-    } else {
-      setPackageType('Bags / Sacks');
-      setPackSize('30');
-      setPackCount((prev) => prev || '100');
-    }
     setModalForm((prev) => ({ ...prev, Unit: newUnit }));
   };
 
@@ -226,32 +148,28 @@ export default function InventoryPage() {
     try {
       setSaving(true);
       setModalError(null);
-      const startingQty = parseFloat(modalForm.Opening_Qty) || 0;
-      const currentStockQty = parseFloat(modalForm.Current_Stock) || 0;
 
       if (editingItem) {
-        // Update Item Details including Current_Stock
+        // Update Item Details (Catalog Metadata)
         await updateItem(editingItem.Item_No, {
           Item_Name: modalForm.Item_Name.trim(),
           SKU: modalForm.SKU.trim(),
           Langar_Requirement: modalForm.SKU.trim(),
           Unit: modalForm.Unit,
-          Current_Stock: currentStockQty,
-          Opening_Qty: parseFloat(modalForm.Opening_Qty) || 0,
           Langar_Qty: parseFloat(modalForm.Langar_Qty) || 0,
           Minimum_Stock: parseFloat(modalForm.Minimum_Stock) || 0,
           Critical_Stock: parseFloat(modalForm.Critical_Stock) || 0,
           Status: modalForm.Status,
         });
       } else {
-        // Create New Item in Catalog (Opening_Qty is base starting stock)
+        // Create New Item in Catalog with 0 initial stock (All stock arrives via Stock Inward)
         await createItem({
           Item_No: modalForm.Item_No.trim(),
           Item_Name: modalForm.Item_Name.trim(),
           SKU: modalForm.SKU.trim(),
           Langar_Requirement: modalForm.SKU.trim(),
           Unit: modalForm.Unit,
-          Opening_Qty: startingQty,
+          Opening_Qty: 0,
           Langar_Qty: parseFloat(modalForm.Langar_Qty) || 0,
           Minimum_Stock: parseFloat(modalForm.Minimum_Stock) || 0,
           Critical_Stock: parseFloat(modalForm.Critical_Stock) || 0,
@@ -285,9 +203,6 @@ export default function InventoryPage() {
   const inStockCount = items.filter((i) => i.Stock_Status === 'IN STOCK').length;
   const lowStockCount = items.filter((i) => i.Stock_Status === 'LOW STOCK').length;
   const criticalStockCount = items.filter((i) => i.Stock_Status === 'CRITICAL').length;
-  const activePackage = PACKAGE_TYPES.find((p) => p.label === packageType);
-  const containerSingular = activePackage ? activePackage.singular : 'Container';
-  const quickSizes = activePackage?.quickSizes || QUICK_SIZES_BY_UNIT[modalForm.Unit] || [5, 10, 20, 25, 30, 50];
 
   return (
     <AppLayout>
@@ -602,21 +517,39 @@ export default function InventoryPage() {
                   </div>
                 )}
 
-                {/* Edit Mode Stock Info Callout */}
-                {editingItem && (
-                  <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-amber-900 font-medium">
-                      <Info className="w-4 h-4 text-amber-600 shrink-0" />
-                      <span>
-                        Current Stock in Hand: <strong>{editingItem.Current_Stock} {editingItem.Unit}</strong> (Inward: +{editingItem.Total_Inward ?? 0}, Outward: -{editingItem.Total_Outward ?? 0})
-                      </span>
+                {/* Modal Mode Context Banner */}
+                {editingItem ? (
+                  <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 text-amber-900 font-bold">
+                        <Info className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>Live Stock & Transactions Overview:</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-gray-700 font-semibold text-xs flex-wrap">
+                        <span>Current Stock: <strong className="text-red-700 font-black text-sm">{editingItem.Current_Stock} {editingItem.Unit}</strong></span>
+                        <span className="text-gray-300">|</span>
+                        <span className="text-emerald-700 font-bold">Total Inward: +{editingItem.Total_Inward ?? 0}</span>
+                        <span className="text-gray-300">|</span>
+                        <span className="text-blue-700 font-bold">Total Outward: -{editingItem.Total_Outward ?? 0}</span>
+                      </div>
                     </div>
                     <Link
                       href="/stock-inward"
-                      className="text-[11px] font-bold text-red-700 hover:underline bg-white px-2 py-0.5 rounded border border-amber-200"
+                      className="inline-flex items-center space-x-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition shadow-2xs shrink-0 cursor-pointer"
                     >
-                      + Add Inward Stock
+                      <ArrowDownLeft className="w-3.5 h-3.5" />
+                      <span>+ Record Inward</span>
                     </Link>
+                  </div>
+                ) : (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 flex items-start gap-2.5 text-xs text-emerald-900">
+                    <Info className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold block">📦 Master Catalog Item Registration (Stock: 0)</span>
+                      <p className="text-[11px] text-emerald-800 mt-0.5">
+                        Yeh form item ko catalog me define karega. Saari stock quantities <strong>Stock Inward</strong> page se enter hongi.
+                      </p>
+                    </div>
                   </div>
                 )}
 
@@ -678,185 +611,7 @@ export default function InventoryPage() {
                   </div>
                 </div>
 
-                {/* Section 2: Packaging & Stock Quantity Calculator (Works for both Add and Edit Item) */}
-                <div className="bg-gradient-to-r from-red-50/60 to-orange-50/60 border border-red-200/80 rounded-2xl p-4 sm:p-5 space-y-4">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center gap-2">
-                      <Calculator className="w-4 h-4 text-red-600" />
-                      <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-                        {editingItem
-                          ? '📦 Current Stock & In-Hand Stock Adjustment'
-                          : 'Packaging & Initial Stock Calculator (Bags / Tins / Packets)'}
-                      </h4>
-                    </div>
-                    <div className="flex bg-white p-0.5 rounded-lg border border-red-200 text-xs font-bold">
-                      <button
-                        type="button"
-                        onClick={() => setCalcMode('package')}
-                        className={`px-3 py-1 rounded-md transition cursor-pointer ${
-                          calcMode === 'package'
-                            ? 'bg-red-600 text-white shadow-2xs'
-                            : 'text-gray-600 hover:text-gray-900'
-                        }`}
-                      >
-                        📦 Packaging Mode (Count × Size)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCalcMode('direct')}
-                        className={`px-3 py-1 rounded-md transition cursor-pointer ${
-                          calcMode === 'direct'
-                            ? 'bg-red-600 text-white shadow-2xs'
-                            : 'text-gray-600 hover:text-gray-900'
-                        }`}
-                      >
-                        🔢 Direct Total Qty
-                      </button>
-                    </div>
-                  </div>
-
-                  {calcMode === 'package' ? (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        {/* Container Type */}
-                        <div>
-                          <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                            Container Type
-                          </label>
-                          <select
-                            value={packageType}
-                            onChange={(e) => handleSelectPackageType(e.target.value)}
-                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl font-medium"
-                          >
-                            {PACKAGE_TYPES.map((p) => (
-                              <option key={p.label} value={p.label}>
-                                {p.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* Number of Containers */}
-                        <div>
-                          <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                            Number of {containerSingular}s <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="number"
-                            step="any"
-                            value={packCount}
-                            onChange={(e) => setPackCount(e.target.value)}
-                            placeholder="e.g. 100"
-                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl font-bold text-gray-900 focus:ring-2 focus:ring-red-500/20"
-                            required
-                          />
-                        </div>
-
-                        {/* Size per Container */}
-                        <div>
-                          <label className="block text-[11px] font-semibold text-gray-700 mb-1">
-                            Size per {containerSingular} ({modalForm.Unit}) <span className="text-red-500">*</span>
-                          </label>
-                          <input
-                            type="number"
-                            step="any"
-                            value={packSize}
-                            onChange={(e) => setPackSize(e.target.value)}
-                            placeholder="e.g. 30"
-                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl font-bold text-gray-900 focus:ring-2 focus:ring-red-500/20"
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      {/* Quick Size Preset Chips */}
-                      <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                        <span className="text-[11px] text-gray-500 font-medium">Quick sizes ({modalForm.Unit}):</span>
-                        {quickSizes.map((sz) => (
-                          <button
-                            key={sz}
-                            type="button"
-                            onClick={() => setPackSize(String(sz))}
-                            className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition cursor-pointer ${
-                              packSize === String(sz)
-                                ? 'bg-red-600 text-white'
-                                : 'bg-white border border-gray-200 text-gray-700 hover:bg-red-50'
-                            }`}
-                          >
-                            {sz} {modalForm.Unit}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Total Calculated Quantity Live Display */}
-                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                        <div>
-                          <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wide">
-                            {editingItem ? 'New Current Stock in Hand' : 'Total Calculated Initial Stock'}
-                          </span>
-                          <div className="text-lg font-black text-emerald-700 mt-0.5">
-                            {editingItem ? modalForm.Current_Stock || '0' : modalForm.Opening_Qty || '0'} {modalForm.Unit}
-                          </div>
-                        </div>
-                        <span className="text-[11px] font-semibold text-gray-600 bg-white px-2.5 py-1 rounded-lg border border-emerald-200">
-                          {packCount || 0} {containerSingular}s × {packSize || 0} {modalForm.Unit}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="block text-xs font-bold text-gray-800 mb-1">
-                        {editingItem
-                          ? `Current Stock in Hand (${modalForm.Unit})`
-                          : `Initial Opening Stock (${modalForm.Unit}) — keep 0 if inwarding later`}{' '}
-                        <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        step="any"
-                        value={editingItem ? modalForm.Current_Stock : modalForm.Opening_Qty}
-                        onChange={(e) =>
-                          setModalForm({
-                            ...modalForm,
-                            Current_Stock: e.target.value,
-                            Opening_Qty: e.target.value,
-                          })
-                        }
-                        placeholder="0"
-                        className="w-full max-w-sm px-3 py-2 bg-white border-2 border-red-300 rounded-xl font-bold text-gray-900 focus:ring-2 focus:ring-red-500/20"
-                        required
-                      />
-                      {!editingItem && (
-                        <p className="text-[11px] text-gray-500 mt-1">
-                          💡 Note: Keep 0 if you plan to record incoming stock through <strong>Stock Inward</strong> so that stock is not double counted.
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {editingItem && (
-                    <div className="bg-white border border-red-200 rounded-xl p-3 text-xs text-gray-600 space-y-1">
-                      <div className="flex items-center justify-between text-[11px] font-bold text-gray-700">
-                        <span>Dynamic Excel Balance Formula:</span>
-                        <span className="text-red-700">
-                          Opening:{' '}
-                          {(
-                            (parseFloat(modalForm.Current_Stock || '0') || 0) -
-                            (editingItem.Total_Inward || 0) +
-                            (editingItem.Total_Outward || 0)
-                          ).toFixed(2)}{' '}
-                          + Inward: +{editingItem.Total_Inward || 0} - Outward: -{editingItem.Total_Outward || 0} ={' '}
-                          {modalForm.Current_Stock || 0} {modalForm.Unit}
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-gray-500">
-                        Saving this will update the Current Stock in Excel and database to accurately reflect your in-hand physical stock.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Section 3: Langar Qty & Threshold Levels */}
+                {/* Section 2: Langar Qty & Threshold Levels */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2 border-t border-gray-100">
                   <div>
                     <label className="block font-semibold text-gray-700 mb-1">Langar Reference Qty</label>
@@ -892,22 +647,6 @@ export default function InventoryPage() {
                     />
                   </div>
                 </div>
-
-                {/* Packaging Breakdown Note / Remarks */}
-                {!editingItem && (
-                  <div>
-                    <label className="block font-semibold text-gray-700 mb-1">
-                      Packaging Notes / Remarks
-                    </label>
-                    <input
-                      type="text"
-                      value={modalForm.Remarks}
-                      onChange={(e) => setModalForm({ ...modalForm, Remarks: e.target.value })}
-                      placeholder="e.g. 100 Bags @ 30 QTL/bag"
-                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl font-medium"
-                    />
-                  </div>
-                )}
 
                 <div className="pt-4 flex items-center justify-between border-t border-gray-100">
                   {editingItem ? (
