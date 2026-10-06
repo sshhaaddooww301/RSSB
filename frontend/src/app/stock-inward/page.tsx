@@ -84,7 +84,7 @@ export default function StockInwardPage() {
   // Single Item Packaging State
   const [calcMode, setCalcMode] = useState<'package' | 'direct'>('package');
   const [packageType, setPackageType] = useState('Bags / Sacks');
-  const [packCount, setPackCount] = useState('100');
+  const [packCount, setPackCount] = useState('');
   const [packSize, setPackSize] = useState('30');
   const [recentSearch, setRecentSearch] = useState('');
   const [recentPage, setRecentPage] = useState(1);
@@ -94,11 +94,11 @@ export default function StockInwardPage() {
     Item_No: '',
     Item_Name: '',
     SKU: '',
-    Unit: 'QTL',
+    Unit: 'KG',
     Current_Stock: '',
     Langar_Qty: '',
     Inward_Date: new Date().toISOString().split('T')[0],
-    Quantity: '3000',
+    Quantity: '',
     Supplier: '',
     Invoice_No: '',
     Storage_Location: '',
@@ -119,13 +119,13 @@ export default function StockInwardPage() {
       Item_No: '',
       Item_Name: '',
       SKU: '',
-      Unit: 'QTL',
+      Unit: 'KG',
       calcMode: 'package',
       packageType: 'Bags / Sacks',
-      packCount: '100',
+      packCount: '',
       packSize: '30',
-      Quantity: '3000',
-      Remarks: '100 Bags @ 30 KG/bag',
+      Quantity: '',
+      Remarks: '',
     },
   ]);
 
@@ -193,11 +193,6 @@ export default function StockInwardPage() {
     setPackageType(pkg.label);
     setPackSize(pkg.defaultSize);
 
-    // If packCount is empty or zero, set default sensible count
-    if (!packCount || parseFloat(packCount) <= 0) {
-      setPackCount(pkg.label === 'Tins / Cans' ? '20' : pkg.label === 'Drums / Barrels' ? '5' : '100');
-    }
-
     // Intelligently sync base unit
     setFormData((prev) => {
       let unit = prev.Unit;
@@ -257,12 +252,11 @@ export default function StockInwardPage() {
     if (isOilOrLiquid) {
       setPackageType('Tins / Cans');
       setPackSize('15');
-      setPackCount('20');
     } else {
       setPackageType('Bags / Sacks');
       setPackSize('30');
-      setPackCount('100');
     }
+    setPackCount('');
 
     setFormData((prev) => ({
       ...prev,
@@ -272,6 +266,7 @@ export default function StockInwardPage() {
       Unit: itemUnit,
       Current_Stock: String(item.Current_Stock ?? item.Opening_Qty ?? 0),
       Langar_Qty: String(item.Langar_Qty ?? 0),
+      Quantity: '',
     }));
   };
 
@@ -297,18 +292,18 @@ export default function StockInwardPage() {
         if (isOilOrLiquid) {
           setPackageType('Tins / Cans');
           setPackSize('15');
-          setPackCount((prevCount) => prevCount || '20');
         } else {
           setPackageType('Bags / Sacks');
           setPackSize('30');
-          setPackCount((prevCount) => prevCount || '100');
         }
+        setPackCount('');
 
         updated.Item_Name = String(found.Item_Name || '');
         updated.SKU = String(found.SKU || '');
         updated.Unit = itemUnit;
         updated.Current_Stock = String(found.Current_Stock ?? found.Opening_Qty ?? 0);
         updated.Langar_Qty = String(found.Langar_Qty ?? 0);
+        updated.Quantity = '';
       }
       return updated;
     });

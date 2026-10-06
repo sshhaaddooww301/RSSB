@@ -72,21 +72,21 @@ export default function InventoryPage() {
   // Packaging & Quantity Calculator State for Add Item
   const [calcMode, setCalcMode] = useState<'package' | 'direct'>('package');
   const [packageType, setPackageType] = useState('Bags / Sacks');
-  const [packCount, setPackCount] = useState('100');
+  const [packCount, setPackCount] = useState('');
   const [packSize, setPackSize] = useState('30');
 
   const [modalForm, setModalForm] = useState({
     Item_No: '',
     Item_Name: '',
     SKU: '', // Stores Langar Requirement
-    Unit: 'QTL',
-    Opening_Qty: '3000',
-    Current_Stock: '3000',
+    Unit: 'KG',
+    Opening_Qty: '0',
+    Current_Stock: '0',
     Langar_Qty: '0',
     Minimum_Stock: '20',
     Critical_Stock: '5',
     Status: 'Active',
-    Remarks: '100 Bags @ 30 QTL/bag',
+    Remarks: '',
   });
   const [modalError, setModalError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);

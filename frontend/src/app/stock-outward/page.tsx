@@ -191,10 +191,6 @@ export default function StockOutwardPage() {
     if (!pkg) return;
     setPackageType(pkg.label);
     setPackSize(pkg.defaultSize);
-
-    if (!packCount || parseFloat(packCount) <= 0) {
-      setPackCount(pkg.label === 'Tins / Cans' ? '2' : pkg.label === 'Drums / Barrels' ? '1' : '5');
-    }
   };
 
   // Update calculated outward quantity when packCount, packSize or packageType changes
@@ -441,11 +437,11 @@ export default function StockOutwardPage() {
         if (isOilOrLiquid) {
           setPackageType('Tins / Cans');
           setPackSize('15');
-          setPackCount((prevCount) => prevCount || '2');
+          setPackCount('');
         } else {
           setPackageType('Bags / Sacks');
           setPackSize('30');
-          setPackCount((prevCount) => prevCount || '5');
+          setPackCount('');
         }
 
         updated.Item_Name = String(found.Item_Name || '');
@@ -453,6 +449,7 @@ export default function StockOutwardPage() {
         updated.Unit = itemUnit;
         updated.Current_Stock = String(found.Current_Stock ?? found.Opening_Qty ?? 0);
         updated.Langar_Qty = String(found.Langar_Qty ?? 0);
+        updated.Quantity = '';
       }
       return updated;
     });
