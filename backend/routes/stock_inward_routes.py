@@ -49,7 +49,7 @@ async def update_inward(
     transaction_id: str,
     body: StockInwardUpdate,
     request: Request,
-    user: dict = Depends(require_roles("ADMIN", "MANAGER", "STAFF")),
+    user: dict = Depends(require_roles("ADMIN")),
 ):
     try:
         update_data = body.model_dump(exclude_none=True)

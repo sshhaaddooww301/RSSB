@@ -54,7 +54,7 @@ async def update_outward(
     transaction_id: str,
     body: StockOutwardUpdate,
     request: Request,
-    user: dict = Depends(require_roles("ADMIN", "MANAGER", "STAFF")),
+    user: dict = Depends(require_roles("ADMIN")),
 ):
     try:
         data_dict = body.model_dump(mode="json", exclude_none=True)

@@ -1157,32 +1157,30 @@ export default function StockOutwardPage() {
                     <td className="px-4 py-3 text-gray-600 font-medium">{row.Remarks || row.Purpose || '-'}</td>
                     <td className="px-4 py-3">{row.Created_By}</td>
                     <td className="px-4 py-3 text-right">
-                      {isViewer ? (
-                        <span className="text-[10px] text-gray-400 font-semibold italic bg-gray-100 px-2 py-1 rounded">
-                          View Only
-                        </span>
-                      ) : (
+                      {isAdmin ? (
                         <div className="flex items-center justify-end space-x-1.5">
                           <button
                             type="button"
                             onClick={() => openEditModal(row)}
                             className="inline-flex items-center space-x-1 px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-[11px] font-bold transition border border-red-200 cursor-pointer shadow-2xs"
-                            title="Edit this outward record"
+                            title="Edit this outward record (Admin Only)"
                           >
                             <Edit2 className="w-3 h-3" />
                             <span>Edit</span>
                           </button>
-                          {isAdmin && (
-                            <button
-                              type="button"
-                              onClick={() => setDeleteConfirmOutward(row)}
-                              className="inline-flex items-center p-1 hover:bg-red-100 text-red-600 rounded-lg text-xs transition border border-transparent hover:border-red-200 cursor-pointer"
-                              title="Delete outward transaction"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => setDeleteConfirmOutward(row)}
+                            className="inline-flex items-center p-1 hover:bg-red-100 text-red-600 rounded-lg text-xs transition border border-transparent hover:border-red-200 cursor-pointer"
+                            title="Delete outward transaction (Admin Only)"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
+                      ) : (
+                        <span className="text-[10px] text-gray-400 font-semibold italic bg-gray-100 px-2 py-1 rounded">
+                          {isViewer ? 'View Only' : 'Admin Protected'}
+                        </span>
                       )}
                     </td>
                   </tr>

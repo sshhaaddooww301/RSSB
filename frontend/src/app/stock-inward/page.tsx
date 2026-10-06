@@ -23,9 +23,20 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
+  Edit2,
+  X,
 } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
-import { getItems, createStockInward, getStockInward, getCurrentUser, isUserViewer } from '@/lib/api';
+import {
+  getItems,
+  createStockInward,
+  updateStockInward,
+  deleteStockInward,
+  getStockInward,
+  getCurrentUser,
+  isUserViewer,
+  isUserAdmin,
+} from '@/lib/api';
 
 const UNITS = ['QTL', 'KG', 'PKT', 'LITRE', 'TIN'];
 
@@ -71,12 +82,40 @@ interface BulkRow {
 export default function StockInwardPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [isViewer, setIsViewer] = useState(false);
+  const isViewer = isUserViewer(currentUser);
+  const isAdmin = isUserAdmin(currentUser);
   const [items, setItems] = useState<any[]>([]);
   const [recentInwards, setRecentInwards] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Edit Inward Modal State (Admin Only)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingInward, setEditingInward] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState({
+    Transaction_ID: '',
+    Item_No: '',
+    Item_Name: '',
+    SKU: '',
+    Unit: 'KG',
+    Inward_Date: '',
+    Quantity: '',
+    Supplier: '',
+    Invoice_No: '',
+    Storage_Location: '',
+    Remarks: '',
+    calcMode: 'direct' as 'package' | 'direct',
+    packageType: 'Bags / Sacks',
+    packCount: '',
+    packSize: '30',
+  });
+  const [editModalError, setEditModalError] = useState<string | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+
+  // Delete Inward State (Admin Only)
+  const [deleteConfirmInward, setDeleteConfirmInward] = useState<any | null>(null);
+  const [deletingInward, setDeletingInward] = useState(false);
 
   // Tab mode: 'single' or 'bulk'
   const [entryMode, setEntryMode] = useState<'single' | 'bulk'>('single');
@@ -241,6 +280,158 @@ export default function StockInwardPage() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openEditModal = (row: any) => {
+    setEditingInward(row);
+    setEditModalError(null);
+
+    const remarks = String(row.Remarks || '');
+    const pkgMatch = remarks.match(
+      /(\d+(?:\.\d+)?)\s*(Bags?|Tins?|Packets?|Boxes?|Drums?|Units?|Sacks?|Cartons?|Pouches?|Cans?|Barrels?|Pieces?)\s*@\s*(\d+(?:\.\d+)?)/i
+    );
+
+    let calcMode: 'package' | 'direct' = 'direct';
+    let packageType = 'Bags / Sacks';
+    let packCount = '';
+    let packSize = '30';
+
+    if (pkgMatch) {
+      calcMode = 'package';
+      packCount = pkgMatch[1];
+      const foundPkgType = pkgMatch[2].toLowerCase();
+      packSize = pkgMatch[3];
+      if (foundPkgType.includes('tin') || foundPkgType.includes('can')) packageType = 'Tins / Cans';
+      else if (foundPkgType.includes('bag') || foundPkgType.includes('sack')) packageType = 'Bags / Sacks';
+      else if (foundPkgType.includes('packet') || foundPkgType.includes('pouch')) packageType = 'Packets / Pouches';
+      else if (foundPkgType.includes('box') || foundPkgType.includes('carton')) packageType = 'Boxes / Cartons';
+      else if (foundPkgType.includes('drum') || foundPkgType.includes('barrel')) packageType = 'Drums / Barrels';
+      else packageType = 'Units / Pieces';
+    }
+
+    setEditForm({
+      Transaction_ID: String(row.Transaction_ID || ''),
+      Item_No: String(row.Item_No || ''),
+      Item_Name: String(row.Item_Name || ''),
+      SKU: String(row.SKU || ''),
+      Unit: String(row.Unit || 'KG').toUpperCase(),
+      Inward_Date: row.Inward_Date || new Date().toISOString().split('T')[0],
+      Quantity: String(row.Quantity || ''),
+      Supplier: String(row.Supplier || ''),
+      Invoice_No: String(row.Invoice_No || ''),
+      Storage_Location: String(row.Storage_Location || ''),
+      Remarks: String(row.Remarks || ''),
+      calcMode,
+      packageType,
+      packCount,
+      packSize,
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditPackageTypeSelect = (ptLabel: string) => {
+    const pkg = PACKAGE_TYPES.find((p) => p.label === ptLabel);
+    if (!pkg) return;
+    const currentCount = editForm.packCount || '';
+    const newSize = pkg.defaultSize;
+    const countNum = parseFloat(currentCount) || 0;
+    const sizeNum = parseFloat(newSize) || 0;
+    const total = countNum * sizeNum;
+
+    setEditForm((prev) => ({
+      ...prev,
+      packageType: pkg.label,
+      packSize: newSize,
+      packCount: currentCount,
+      Quantity: total > 0 ? String(total) : prev.Quantity,
+      Remarks:
+        countNum > 0 && sizeNum > 0
+          ? `${countNum} ${pkg.singular}s @ ${sizeNum} ${prev.Unit}/${pkg.singular.toLowerCase()}`
+          : prev.Remarks,
+    }));
+  };
+
+  const handleEditPackageCountOrSize = (newCount: string, newSize: string) => {
+    const countNum = parseFloat(newCount) || 0;
+    const sizeNum = parseFloat(newSize) || 0;
+    const total = countNum * sizeNum;
+    const selectedPkg = PACKAGE_TYPES.find((p) => p.label === editForm.packageType);
+    const pkgLabel = selectedPkg ? selectedPkg.singular : 'Pack';
+
+    setEditForm((prev) => ({
+      ...prev,
+      packCount: newCount,
+      packSize: newSize,
+      Quantity: total > 0 ? String(total) : '',
+      Remarks:
+        countNum > 0 && sizeNum > 0
+          ? `${countNum} ${pkgLabel}s @ ${sizeNum} ${prev.Unit}/${pkgLabel.toLowerCase()}`
+          : prev.Remarks,
+    }));
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditModalError(null);
+    const qty = parseFloat(editForm.Quantity);
+    if (isNaN(qty) || qty <= 0) {
+      setEditModalError('Please enter a valid positive Quantity.');
+      return;
+    }
+
+    try {
+      setEditSaving(true);
+      await updateStockInward(editForm.Transaction_ID, {
+        Inward_Date: editForm.Inward_Date,
+        Quantity: qty,
+        Supplier: editForm.Supplier.trim(),
+        Invoice_No: editForm.Invoice_No.trim(),
+        Storage_Location: editForm.Storage_Location.trim(),
+        Remarks: editForm.Remarks.trim(),
+      });
+
+      setMessage({
+        type: 'success',
+        text: `Stock Inward #${editForm.Transaction_ID} updated successfully in Excel & Database!`,
+      });
+
+      setIsEditModalOpen(false);
+      setEditingInward(null);
+
+      // Refresh data
+      const [itemsRes, inwardRes] = await Promise.all([getItems(), getStockInward()]);
+      if (itemsRes && itemsRes.data) setItems(itemsRes.data);
+      if (inwardRes && inwardRes.data) setRecentInwards(inwardRes.data);
+    } catch (err: any) {
+      setEditModalError(err.message || 'Failed to update stock inward record.');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleDeleteInward = async () => {
+    if (!deleteConfirmInward) return;
+    try {
+      setDeletingInward(true);
+      await deleteStockInward(deleteConfirmInward.Transaction_ID);
+      setMessage({
+        type: 'success',
+        text: `Inward record #${deleteConfirmInward.Transaction_ID} deleted successfully!`,
+      });
+      setDeleteConfirmInward(null);
+
+      // Refresh data
+      const [itemsRes, inwardRes] = await Promise.all([getItems(), getStockInward()]);
+      if (itemsRes && itemsRes.data) setItems(itemsRes.data);
+      if (inwardRes && inwardRes.data) setRecentInwards(inwardRes.data);
+    } catch (err: any) {
+      setMessage({
+        type: 'error',
+        text: err.message || 'Failed to delete stock inward record.',
+      });
+    } finally {
+      setDeletingInward(false);
     }
   };
 
@@ -1427,6 +1618,7 @@ export default function StockInwardPage() {
                   <th className="px-4 py-3">Supplier</th>
                   <th className="px-4 py-3">Packaging / Remarks</th>
                   <th className="px-4 py-3">Created By</th>
+                  <th className="px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-medium">
@@ -1441,11 +1633,38 @@ export default function StockInwardPage() {
                     <td className="px-4 py-3">{row.Supplier || '-'}</td>
                     <td className="px-4 py-3 text-gray-600 font-medium">{row.Remarks || row.Invoice_No || '-'}</td>
                     <td className="px-4 py-3">{row.Created_By}</td>
+                    <td className="px-4 py-3 text-right">
+                      {isAdmin ? (
+                        <div className="flex items-center justify-end space-x-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(row)}
+                            className="inline-flex items-center space-x-1 px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-[11px] font-bold transition border border-red-200 cursor-pointer shadow-2xs"
+                            title="Edit this inward record (Admin Only)"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteConfirmInward(row)}
+                            className="inline-flex items-center p-1 hover:bg-red-100 text-red-600 rounded-lg text-xs transition border border-transparent hover:border-red-200 cursor-pointer"
+                            title="Delete inward transaction (Admin Only)"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-gray-400 font-semibold italic bg-gray-100 px-2 py-1 rounded">
+                          {isViewer ? 'View Only' : 'Admin Protected'}
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {filteredInwards.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center text-gray-400">
+                    <td colSpan={10} className="px-4 py-8 text-center text-gray-400">
                       {recentSearch ? 'No matching inward records found.' : 'No stock inward records yet.'}
                     </td>
                   </tr>
@@ -1512,6 +1731,300 @@ export default function StockInwardPage() {
             </div>
           )}
         </div>
+
+        {/* Edit Inward Modal (Admin Only) */}
+        {isEditModalOpen && editingInward && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-150">
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-2xl max-w-lg w-full p-6 animate-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-2 bg-red-100 text-red-600 rounded-xl">
+                    <Edit2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900">
+                      Edit Stock Inward Record
+                    </h3>
+                    <p className="text-[11px] text-gray-500 font-medium">
+                      Transaction #{editForm.Transaction_ID} (Admin Protected)
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {editModalError && (
+                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center space-x-2 text-xs text-red-700 font-medium">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{editModalError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSaveEdit} className="mt-4 space-y-4">
+                {/* Fixed Item Details */}
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-gray-400 block">
+                      Item
+                    </span>
+                    <span className="font-bold text-gray-800">
+                      #{editForm.Item_No} - {editForm.Item_Name}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-gray-400 block">
+                      Unit
+                    </span>
+                    <span className="font-bold text-gray-800">{editForm.Unit}</span>
+                  </div>
+                </div>
+
+                {/* Inward Date */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Inward Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={editForm.Inward_Date}
+                    onChange={(e) => setEditForm({ ...editForm, Inward_Date: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-medium"
+                    required
+                  />
+                </div>
+
+                {/* Packaging & Quantity */}
+                <div className="bg-red-50/50 border border-red-200/80 rounded-xl p-3.5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+                      <Calculator className="w-3.5 h-3.5 text-red-600" />
+                      Inward Quantity
+                    </span>
+                    <div className="flex items-center space-x-1 bg-white p-0.5 rounded-lg border border-gray-200">
+                      <button
+                        type="button"
+                        onClick={() => setEditForm((prev) => ({ ...prev, calcMode: 'package' }))}
+                        className={`px-2 py-1 rounded text-[10px] font-bold transition cursor-pointer ${
+                          editForm.calcMode === 'package'
+                            ? 'bg-red-600 text-white shadow-2xs'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        Pack Calculator
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditForm((prev) => ({ ...prev, calcMode: 'direct' }))}
+                        className={`px-2 py-1 rounded text-[10px] font-bold transition cursor-pointer ${
+                          editForm.calcMode === 'direct'
+                            ? 'bg-red-600 text-white shadow-2xs'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        Direct Qty
+                      </button>
+                    </div>
+                  </div>
+
+                  {editForm.calcMode === 'package' ? (
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-1.5">
+                        {PACKAGE_TYPES.map((pt) => (
+                          <button
+                            key={pt.label}
+                            type="button"
+                            onClick={() => handleEditPackageTypeSelect(pt.label)}
+                            className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition cursor-pointer ${
+                              editForm.packageType === pt.label
+                                ? 'bg-red-600 text-white border-red-600 shadow-2xs'
+                                : 'bg-white text-gray-700 border-gray-200 hover:border-red-300'
+                            }`}
+                          >
+                            {pt.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 items-center">
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-600 mb-0.5">
+                            Pack Count
+                          </label>
+                          <input
+                            type="number"
+                            step="any"
+                            value={editForm.packCount}
+                            onChange={(e) =>
+                              handleEditPackageCountOrSize(e.target.value, editForm.packSize)
+                            }
+                            placeholder="e.g. 10"
+                            className="w-full px-2 py-1.5 text-xs bg-white border border-gray-300 rounded-lg font-bold"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-600 mb-0.5">
+                            Size ({editForm.Unit})
+                          </label>
+                          <input
+                            type="number"
+                            step="any"
+                            value={editForm.packSize}
+                            onChange={(e) =>
+                              handleEditPackageCountOrSize(editForm.packCount, e.target.value)
+                            }
+                            placeholder="e.g. 30"
+                            className="w-full px-2 py-1.5 text-xs bg-white border border-gray-300 rounded-lg font-bold"
+                          />
+                        </div>
+                        <div className="bg-white border border-emerald-300 rounded-lg p-1.5 text-center flex flex-col justify-center">
+                          <span className="text-[10px] font-bold text-emerald-800 uppercase">
+                            Total Qty
+                          </span>
+                          <span className="text-base font-black text-emerald-700">
+                            {editForm.Quantity || '0'} {editForm.Unit}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-bold text-gray-800 mb-1">
+                        Inward Quantity ({editForm.Unit}) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={editForm.Quantity}
+                        onChange={(e) => setEditForm({ ...editForm, Quantity: e.target.value })}
+                        placeholder="e.g. 1500"
+                        className="w-full px-3 py-2 text-xs bg-white border-2 border-red-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500 font-bold text-gray-900"
+                        required
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Additional Info Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Supplier / Vendor
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.Supplier}
+                      onChange={(e) => setEditForm({ ...editForm, Supplier: e.target.value })}
+                      placeholder="e.g. Kisan Mandi"
+                      className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Invoice / Challan No
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.Invoice_No}
+                      onChange={(e) => setEditForm({ ...editForm, Invoice_No: e.target.value })}
+                      placeholder="e.g. BILL-2026-09"
+                      className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Storage Location
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.Storage_Location}
+                      onChange={(e) => setEditForm({ ...editForm, Storage_Location: e.target.value })}
+                      placeholder="e.g. Main Godown"
+                      className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Remarks / Notes
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.Remarks}
+                      onChange={(e) => setEditForm({ ...editForm, Remarks: e.target.value })}
+                      placeholder="e.g. 50 Bags @ 30 KG"
+                      className="w-full px-3 py-2 text-xs bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Modal Footer Buttons */}
+                <div className="flex items-center justify-end space-x-2.5 pt-4 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(false)}
+                    disabled={editSaving}
+                    className="px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl text-xs font-semibold transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editSaving}
+                    className="inline-flex items-center space-x-1.5 px-5 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-xs disabled:opacity-50"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{editSaving ? 'Updating...' : 'Save & Update Inward'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Inward Confirmation Modal (Admin Only) */}
+        {deleteConfirmInward && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-2xl max-w-md w-full p-6 animate-in zoom-in-95 duration-150">
+              <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-gray-900 text-center">
+                Delete Inward Transaction?
+              </h3>
+              <p className="text-xs text-gray-500 text-center mt-1.5">
+                Are you sure you want to delete inward transaction <strong>#{deleteConfirmInward.Transaction_ID}</strong> for <strong>{deleteConfirmInward.Item_Name}</strong> (+{deleteConfirmInward.Quantity} {deleteConfirmInward.Unit})?
+                This will automatically deduct this inward quantity from current stock.
+              </p>
+              <div className="flex items-center justify-center space-x-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmInward(null)}
+                  disabled={deletingInward}
+                  className="px-4 py-2 border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl text-xs font-semibold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteInward}
+                  disabled={deletingInward}
+                  className="inline-flex items-center space-x-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition cursor-pointer disabled:opacity-50 shadow-xs"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{deletingInward ? 'Deleting...' : 'Yes, Delete Record'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AppLayout>
   );
